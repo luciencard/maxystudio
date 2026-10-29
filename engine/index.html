@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ScratchCode – Scratch en code</title>
+  <meta name="description" content="ScratchCode : Scratch 3 où les blocs s'écrivent en texte, avec autocomplétion, extensions TurboWarp, exemples de jeux et assistant IA.">
+  <meta name="theme-color" content="#855cd6">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <script src="/lib/scratch-storage.min.js"></script>
+  <script src="/lib/scratch-render.min.js"></script>
+  <script src="/lib/scratch-vm.js"></script>
+  <script type="module" crossorigin src="/assets/index-BMO53G6b.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Py_obyfT.css">
+</head>
+<body>
+  <header class="menubar">
+    <a class="logo" href="/" title="ScratchCode">
+      <img src="/favicon.svg" alt="" width="30" height="30">
+      <span class="logo-text">Scratch<b>Code</b></span>
+    </a>
+    <div class="menu" data-menu="settings"><button class="menu-btn"><i data-icon="gear"></i><span data-i18n>Paramètres</span><i data-icon="down" data-size="14"></i></button>
+      <div class="menu-pop">
+        <div class="sub"><button class="sub-btn"><i data-icon="globe"></i><span data-i18n>Langue</span><i data-icon="right" data-size="16"></i></button><div class="sub-pop" id="langMenu"></div></div>
+        <div class="sub"><button class="sub-btn"><i data-icon="palette"></i><span data-i18n>Thème</span><i data-icon="right" data-size="16"></i></button><div class="sub-pop" id="themeMenu"></div></div>
+        <div class="sub"><button class="sub-btn"><i data-icon="contrast"></i><span data-i18n>Mode couleur</span><i data-icon="right" data-size="16"></i></button><div class="sub-pop" id="colorMenu"></div></div>
+        <hr>
+        <button data-href="https://scratchcodelearn.web.app">ScratchCode Cours</button>
+        <button data-href="https://scratchcodephp.web.app">ScratchCode PHP</button>
+        <button data-href="https://scratchcodenews.web.app">ScratchCode Actualités</button>
+      </div>
+    </div>
+    <div class="menu" data-menu="file"><button class="menu-btn"><i data-icon="file"></i><span data-i18n>Fichier</span><i data-icon="down" data-size="14"></i></button>
+      <div class="menu-pop">
+        <button data-act="new" data-i18n>Nouveau</button>
+        <button data-act="open" data-i18n>Charger depuis votre ordinateur</button>
+        <button data-act="download" data-i18n>Sauvegarder sur votre ordinateur</button>
+        <hr>
+        <button data-act="gallery-publish" data-i18n>Publier dans la galerie</button>
+        <button data-act="gallery" data-i18n>Explorer la galerie</button>
+        <hr>
+        <button data-act="scratch-import" data-i18n>Charger depuis Scratch</button>
+        <button data-act="cloud-save" class="needs-auth" data-i18n>Sauvegarder dans le cloud</button>
+        <button data-act="cloud-list" class="needs-auth" data-i18n>Mes projets</button>
+      </div>
+    </div>
+    <div class="menu" data-menu="edit"><button class="menu-btn"><i data-icon="edit"></i><span data-i18n>Modifier</span><i data-icon="down" data-size="14"></i></button>
+      <div class="menu-pop">
+        <button data-act="turbo" data-i18n>Activer le mode Turbo</button>
+        <button data-act="format" data-i18n>Remettre le code en forme</button>
+      </div>
+    </div>
+    <button class="menu-btn hide-sm" data-act="examples"><i data-icon="grid"></i><span data-i18n>Exemples</span></button>
+    <button class="menu-btn hide-sm" data-act="gallery" title="Galerie de la communauté"><i data-icon="image"></i><span data-i18n>Galerie</span></button>
+    <button class="menu-btn hide-sm" data-act="help"><i data-icon="book"></i><span data-i18n>Syntaxe</span></button>
+    <input class="title-input" id="title" value="Projet Scratch" spellcheck="false" aria-label="Titre du projet">
+    <button class="menu-btn share-btn" data-act="gallery-publish" title="Publier dans la galerie communautaire"><i data-icon="share"></i><span data-i18n>Partager</span></button>
+    <span class="grow"></span>
+    <span class="save-status" id="saveStatus"></span>
+    <a class="menu-btn hide-sm" href="/installer/" title="Installer ScratchCode"><i data-icon="download"></i><span data-i18n>Installer</span></a>
+    <button class="m-only m-run" data-act="run" title="Drapeau vert"><svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3v18" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><path d="M6 4c4-2 7 2 12 0v9c-5 2-8-2-12 0z" fill="#4cbf56" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+    <button class="m-only m-stop" data-act="stop" title="Stop"><svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z" fill="#ec5959" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+    <button class="m-only m-menu" id="mMenuBtn" title="Menu"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <button class="menu-btn login-btn" id="loginBtn" data-act="login"><i data-icon="user"></i><span data-i18n>Se connecter</span></button>
+    <div class="menu account" id="accountMenu" hidden>
+      <button class="menu-btn account-btn"><img id="avatar" alt=""><span id="userName"></span><i data-icon="down" data-size="14"></i></button>
+      <div class="menu-pop right">
+        <button data-act="cloud-list" data-i18n>Mes projets</button>
+        <button data-act="cloud-save" data-i18n>Sauvegarder maintenant</button>
+        <button data-act="scratch-link">Mon compte Scratch</button>
+        <hr>
+        <button data-act="logout" data-i18n>Se déconnecter</button>
+        <button data-act="delete-account" class="danger-item">Supprimer mon compte</button>
+        <hr>
+        <a href="/privacy/" target="_blank" rel="noopener">Confidentialité</a>
+        <a href="/terms/" target="_blank" rel="noopener">Conditions d'utilisation</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="gui">
+    <section class="editor-pane">
+      <nav class="tabs">
+        <button class="tab active" data-tab="code"><i data-icon="code"></i><span data-i18n>Code</span></button>
+        <button class="tab" data-tab="costumes"><i data-icon="brush"></i><span id="costumesTabLabel" data-i18n>Costumes</span></button>
+        <button class="tab" data-tab="sounds"><i data-icon="sound"></i><span data-i18n>Sons</span></button>
+        <button class="tab tab-stage-only" data-tab="stage"><i data-icon="play"></i><span data-i18n>Scène</span></button>
+      </nav>
+
+      <div class="tab-body" id="tab-code">
+        <div class="cat-col">
+          <div class="categories" id="categories"></div>
+          <button class="ext-btn" id="extBtn" title="Ajouter une extension"><i data-icon="extadd" data-size="26"></i></button>
+        </div>
+        <div class="palette" id="palette"></div>
+        <div class="code-area">
+          <div class="code-toolbar">
+            <button class="pal-toggle" id="palToggle" title="Codes"><i data-icon="puzzle" data-size="18"></i></button>
+            <span class="editing-label"><span data-i18n>Code de</span> <b id="editingName">Sprite1</b></span>
+            <span class="grow"></span>
+            <span id="errStatus" class="err-status ok">Aucune erreur</span>
+            <button class="tool-btn" id="toBackpack" title="Mettre la sélection (ou tout le code) dans le sac à dos"><i data-icon="bag" data-size="18"></i></button>
+            <label class="toggle"><input type="checkbox" id="previewToggle"> <span data-i18n>Voir en Scratch</span></label>
+          </div>
+          <div class="code-keys" id="codeKeys"></div>
+          <div class="code-split">
+            <div class="cm-host" id="editor"></div>
+            <div class="preview" id="preview" hidden></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-body" id="tab-costumes" hidden>
+        <div class="asset-list">
+          <div class="asset-items" id="costumeList"></div>
+          <div class="add-menu up">
+            <button class="fab" title="Choisir un costume"><i data-icon="scratchcat" data-size="26"></i></button>
+            <div class="fab-pop">
+              <button data-add-costume="upload" title="Importer"><i data-icon="upload"></i></button>
+              <button data-add-costume="paint" title="Peindre"><i data-icon="brush"></i></button>
+              <button data-add-costume="library" title="Choisir un costume"><i data-icon="search"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="paint" id="paint"></div>
+      </div>
+
+      <div class="tab-body" id="tab-sounds" hidden>
+        <div class="asset-list">
+          <div class="asset-items" id="soundList"></div>
+          <div class="add-menu up">
+            <button class="fab" title="Choisir un son"><i data-icon="sound" data-size="26"></i></button>
+            <div class="fab-pop">
+              <button data-add-sound="upload" title="Importer"><i data-icon="upload"></i></button>
+              <button data-add-sound="record" title="Enregistrer"><i data-icon="mic"></i></button>
+              <button data-add-sound="synth" title="Composer une mélodie"><i data-icon="keys"></i></button>
+              <button data-add-sound="library" title="Choisir un son"><i data-icon="search"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="sound-editor">
+          <div class="se-top">
+            <label class="field-label"><span data-i18n>Son</span> <input id="soundName" class="pill-input" spellcheck="false"></label>
+          </div>
+          <div class="wave-box"><canvas id="wave" class="wave" width="900" height="220"></canvas></div>
+          <div class="se-actions">
+            <button class="se-play" id="soundPlay" title="Écouter"><i data-icon="play" data-size="26"></i></button>
+            <div class="se-fx">
+              <button data-fx="faster"><i data-icon="faster" data-size="24"></i><span data-i18n>Plus vite</span></button>
+              <button data-fx="slower"><i data-icon="slower" data-size="24"></i><span data-i18n>Plus lent</span></button>
+              <button data-fx="echo"><i data-icon="echo" data-size="24"></i><span data-i18n>Écho</span></button>
+              <button data-fx="robot"><i data-icon="robot" data-size="24"></i><span data-i18n>Robot</span></button>
+              <button data-fx="louder"><i data-icon="louder" data-size="24"></i><span data-i18n>Plus fort</span></button>
+              <button data-fx="softer"><i data-icon="softer" data-size="24"></i><span data-i18n>Plus doux</span></button>
+              <button data-fx="fadein"><i data-icon="fadein" data-size="24"></i><span data-i18n>Fondu entrant</span></button>
+              <button data-fx="fadeout"><i data-icon="fadeout" data-size="24"></i><span data-i18n>Fondu sortant</span></button>
+              <button data-fx="reverse"><i data-icon="reverse" data-size="24"></i><span data-i18n>Inverser</span></button>
+            </div>
+          </div>
+          <p class="muted" id="soundEmpty" hidden>Ce sprite n'a pas encore de son. Ajoutes-en un avec le bouton en bas à gauche.</p>
+        </div>
+      </div>
+
+      <div class="backpack" id="backpack">
+        <button class="bp-head"><i data-icon="bag" data-size="16"></i><span data-i18n>Sac à dos</span></button>
+        <div class="bp-items"></div>
+      </div>
+    </section>
+
+    <section class="stage-pane" id="stagePane">
+      <div class="stage-header">
+        <button class="flag" id="flagBtn" title="Drapeau vert">
+          <svg viewBox="0 0 24 24" width="26" height="26"><path d="M5 3v18" stroke="#45993d" stroke-width="2.4" stroke-linecap="round"/><path d="M6 4c4-2 7 2 12 0v9c-5 2-8-2-12 0z" fill="#4cbf56" stroke="#45993d" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="stop" id="stopBtn" title="Stop">
+          <svg viewBox="0 0 24 24" width="24" height="24"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z" fill="#ec5959" stroke="#b84848" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        </button>
+        <span class="turbo-label" id="turboLabel" hidden data-i18n>Mode Turbo</span>
+        <span class="grow"></span>
+        <button class="stage-size hide-sm" data-size="small" title="Petite scène"><i data-icon="small"></i></button>
+        <button class="stage-size active hide-sm" data-size="normal" title="Scène normale"><i data-icon="normal"></i></button>
+        <button class="stage-size" data-size="full" title="Plein écran"><i data-icon="full"></i></button>
+      </div>
+      <div class="stage-wrap" id="stageWrap">
+        <canvas id="stage" width="480" height="360"></canvas>
+        <div class="monitors" id="monitors"></div>
+        <form class="question" id="question" hidden>
+          <div class="q-text" id="qText"></div>
+          <div class="q-row"><input id="qInput" autocomplete="off"><button title="Valider"><i data-icon="check" data-size="16"></i></button></div>
+        </form>
+        <div class="coords" id="coords">x: 0 y: 0</div>
+      </div>
+
+      <div class="target-pane">
+        <div class="sprite-side">
+          <div class="sprite-info" id="spriteInfo">
+            <div class="row">
+              <label><span data-i18n>Sprite</span> <input id="spName" spellcheck="false"></label>
+              <label><span class="axis">x</span> <input id="spX" type="number"></label>
+              <label><span class="axis">y</span> <input id="spY" type="number"></label>
+            </div>
+            <div class="row">
+              <span class="lbl" data-i18n>Afficher</span>
+              <span class="vis-group">
+                <button class="vis on" id="spShow" title="Afficher"><i data-icon="eye" data-size="18"></i></button>
+                <button class="vis" id="spHide" title="Cacher"><i data-icon="eyeoff" data-size="18"></i></button>
+              </span>
+              <label><span data-i18n>Taille</span> <input id="spSize" type="number"></label>
+              <label><span data-i18n>Direction</span> <input id="spDir" type="number"></label>
+            </div>
+          </div>
+          <div class="sprite-list" id="spriteList"></div>
+          <div class="add-menu">
+            <button class="fab" title="Choisir un sprite"><i data-icon="scratchcat" data-size="26"></i></button>
+            <div class="fab-pop">
+              <button data-add-sprite="upload" title="Importer"><i data-icon="upload"></i></button>
+              <button data-add-sprite="surprise" title="Surprise"><i data-icon="surprise"></i></button>
+              <button data-add-sprite="paint" title="Peindre"><i data-icon="brush"></i></button>
+              <button data-add-sprite="library" title="Choisir un sprite"><i data-icon="search"></i></button>
+            </div>
+          </div>
+        </div>
+        <div class="stage-side">
+          <div class="stage-tile" id="stageTile">
+            <div class="st-title" data-i18n>Scène</div>
+            <img id="stageThumb" alt="">
+            <div class="st-count"><span data-i18n>Arrière-plans</span><br><b id="backdropCount">1</b></div>
+          </div>
+          <div class="add-menu">
+            <button class="fab" title="Choisir un arrière-plan"><i data-icon="image" data-size="26"></i></button>
+            <div class="fab-pop">
+              <button data-add-backdrop="upload" title="Importer"><i data-icon="upload"></i></button>
+              <button data-add-backdrop="paint" title="Peindre"><i data-icon="brush"></i></button>
+              <button data-add-backdrop="library" title="Choisir un arrière-plan"><i data-icon="search"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-back" id="modalBack" hidden>
+    <div class="modal" id="modal">
+      <div class="modal-head"><span id="modalTitle"></span><button class="modal-close" id="modalClose" title="Fermer"><i data-icon="x" data-size="18"></i></button></div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+  <input type="file" id="filePick" hidden>
+
+  <nav class="bottom-nav" id="bottomNav">
+    <button data-nav="code" class="on"><i data-icon="code" data-size="22"></i><span data-i18n>Code</span></button>
+    <button data-nav="costumes"><i data-icon="brush" data-size="22"></i><span data-i18n>Costumes</span></button>
+    <button data-nav="sounds"><i data-icon="sound" data-size="22"></i><span data-i18n>Sons</span></button>
+    <button data-nav="stage"><i data-icon="play" data-size="22"></i><span data-i18n>Scène</span></button>
+  </nav>
+  <div class="sheet-back" id="sheetBack"></div>
+  <aside class="m-sheet" id="mSheet" aria-label="Menu"></aside>
+
+</body>
+</html>

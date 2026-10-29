@@ -1,0 +1,58 @@
+/* Écran d'accueil de ScratchCode Studio, dans l'esprit de l'écran « Welcome » des IDE JetBrains */
+.wl { display: flex; height: 100vh; }
+.wl-side { flex: none; width: 230px; display: flex; flex-direction: column; gap: 2px; padding: 16px 10px; background: var(--panel); border-right: 1px solid var(--line); }
+.wl-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 20px; }
+.wl-brand b { display: block; font-size: 14px; color: var(--text); }
+.wl-brand span { color: var(--muted); font-size: 12px; }
+.wl-nav { height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: none; color: var(--text-2); text-align: left; cursor: pointer; }
+.wl-nav:hover { background: var(--hover); }
+.wl-nav.active { background: var(--accent-soft); color: #fff; }
+.wl-main { flex: 1; min-width: 0; overflow: auto; padding: 18px 24px; }
+.wl-panel { display: none; }
+.wl-panel.active { display: block; }
+.wl-panel h1 { margin: 6px 0 18px; font-size: 20px; font-weight: 600; }
+.wl-top { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.wl-search { flex: 1; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--muted); }
+.wl-search:focus-within { border-color: var(--accent); }
+.wl-search input { flex: 1; border: 0; outline: none; background: none; color: var(--text); font: inherit; user-select: text; }
+.wl-btn { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--text); cursor: pointer; }
+.wl-btn:hover { background: var(--hover); }
+.wl-btn.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+.wl-btn.primary:hover { background: #4682fa; }
+.wl-btn:disabled { opacity: .5; }
+.wl-proj { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
+.wl-proj:hover { background: var(--select); }
+.wl-proj .p-ic { flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; color: #fff; font-size: 12px; font-weight: 800; }
+.wl-proj .p-text { min-width: 0; display: flex; flex-direction: column; }
+.wl-proj .p-text b { font-weight: 600; color: var(--text); }
+.wl-proj .p-text span { color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wl-proj .p-time { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.wl-empty { padding: 60px 20px; text-align: center; color: var(--muted); }
+.wl-empty b { display: block; margin-bottom: 8px; color: var(--text); font-size: 16px; }
+.wl-learn { display: grid; gap: 12px; max-width: 760px; }
+.wl-card { padding: 14px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.wl-card b { color: var(--text); }
+.wl-card p { margin: 6px 0 0; color: var(--text-2); line-height: 1.7; }
+.wl-card code { padding: 1px 5px; border-radius: 4px; background: var(--bg); font-family: "JetBrains Mono", Consolas, monospace; font-size: 12px; }
+
+/* Fenêtre « Nouveau projet » */
+.wl-dialog-back { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center; background: rgba(0, 0, 0, .4); }
+.wl-dialog-back.show { display: flex; }
+.wl-dialog { width: min(760px, 92vw); height: min(480px, 88vh); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #43454a; border-radius: 10px; background: var(--panel); box-shadow: 0 20px 60px rgba(0, 0, 0, .55); }
+.wl-dialog-head { padding: 12px 16px; font-weight: 600; border-bottom: 1px solid var(--line); }
+.wl-dialog-body { flex: 1; min-height: 0; display: flex; }
+.wl-gens { flex: none; width: 220px; padding: 10px 8px; border-right: 1px solid var(--line); background: var(--panel-2); }
+.wl-gens-title { padding: 2px 8px 8px; color: var(--muted); font-size: 11.5px; }
+.wl-gen { width: 100%; height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: var(--text); text-align: left; cursor: pointer; }
+.wl-gen:hover { background: var(--hover); }
+.wl-gen.sel { background: var(--accent-soft); }
+.wl-gen .g-ic { width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 5px; color: #fff; }
+.wl-form { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 16px 20px; }
+.wl-form label { margin-top: 8px; color: var(--text-2); }
+.wl-form .field { height: 30px; padding: 0 10px; font: inherit; user-select: text; }
+.wl-form .loc-row { display: flex; gap: 6px; }
+.wl-form .loc-row .field { flex: 1; }
+.wl-desc { margin: 0 0 4px; color: var(--text-2); }
+.path-preview { color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wl-note { margin-top: auto; padding: 10px 12px; border-radius: 6px; background: var(--bg); color: var(--text-2); font-size: 12.5px; }
+.wl-dialog-foot { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }

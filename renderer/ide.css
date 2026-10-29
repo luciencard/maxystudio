@@ -1,0 +1,205 @@
+/* ScratchCode Studio – thème inspiré de la « New UI » sombre des IDE JetBrains */
+/* JetBrains Mono (licence SIL Open Font 1.1, voir fonts/JetBrainsMono-OFL.txt) */
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Bold.woff2") format("woff2"); font-weight: 700; font-style: normal; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; }
+body.jb {
+  --bg: #1e1f22;
+  --panel: #2b2d30;
+  --panel-2: #26282b;
+  --line: #393b40;
+  --line-soft: #313438;
+  --text: #dfe1e5;
+  --text-2: #bcbec4;
+  --muted: #868a91;
+  --accent: #3574f0;
+  --accent-soft: #2e436e;
+  --select: #2e3b55;
+  --hover: #393b40;
+  --green: #5fb865;
+  --red: #db5c5c;
+  --yellow: #e0b44c;
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 "Inter", "Segoe UI", system-ui, sans-serif;
+  user-select: none;
+}
+body.jb .grow { flex: 1; }
+body.jb .ide { display: flex; flex-direction: column; height: 100vh; }
+body.jb button { font: inherit; color: inherit; }
+
+/* ---------- Barre d'outils ---------- */
+.jb-toolbar { flex: none; height: 40px; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); -webkit-app-region: drag; }
+.jb-toolbar > * { -webkit-app-region: no-drag; }
+.jb-tb { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: none; color: var(--text-2); cursor: pointer; }
+.jb-tb:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.jb-tb:disabled { opacity: .35; cursor: default; }
+.jb-run { color: var(--green); }
+.jb-run.on { background: rgba(95, 184, 101, .16); }
+.jb-stop:not(:disabled) { color: var(--red); }
+.jb-sep { width: 1px; height: 18px; margin: 0 6px; background: var(--line); }
+.jb-widget { height: 30px; display: inline-flex; align-items: center; gap: 7px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: var(--text); cursor: pointer; }
+.jb-widget:hover { background: var(--hover); }
+.jb-widget b { font-weight: 600; }
+.jb-proj-icon { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; background: linear-gradient(135deg, #a77bff, #855cd6); color: #fff; font-size: 9.5px; font-weight: 800; }
+.jb-path { margin-left: 4px; color: var(--muted); font-size: 12px; max-width: 34vw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.jb-runconfig { color: var(--text-2); }
+
+/* ---------- Zone principale ---------- */
+.jb-main { flex: 1; min-height: 0; display: flex; }
+.jb-stripe { flex: none; width: 40px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; background: var(--panel); border-right: 1px solid var(--line); }
+.jb-stripe-right { border-right: 0; border-left: 1px solid var(--line); }
+.jb-stripe-btn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.jb-stripe-btn:hover { background: var(--hover); color: var(--text); }
+.jb-stripe-btn.active { background: var(--accent-soft); color: #fff; }
+.jb-center { flex: 1; min-width: 0; display: flex; flex-direction: column; --side-w: 260px; --game-w: 460px; --bottom-h: 210px; }
+.jb-row { flex: 1; min-height: 0; display: flex; }
+
+/* ---------- Fenêtres d'outils ---------- */
+.jb-tool { display: flex; flex-direction: column; min-width: 0; background: var(--panel); }
+.jb-left { flex: none; width: var(--side-w); }
+.jb-right { flex: none; width: var(--game-w); }
+.jb-tool[hidden], .jb-bottom[hidden] { display: none !important; }
+.jb-tool-head { flex: none; height: 34px; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 12px; }
+.jb-tool-head.jb-sub { border-top: 1px solid var(--line); }
+.jb-tool-title { font-weight: 600; color: var(--text); }
+.jb-dim { margin-left: 8px; color: var(--muted); font-size: 12px; }
+.jb-icon-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 5px; background: none; color: var(--muted); cursor: pointer; }
+.jb-icon-btn:hover { background: var(--hover); color: var(--text); }
+.jb-tool-body { flex: 1; min-height: 0; overflow: auto; }
+
+/* Arborescence du projet */
+body.jb .tree { padding: 2px 0 10px; }
+body.jb .tree .node { height: 24px; display: flex; align-items: center; gap: 4px; padding-right: 8px; border-radius: 0; color: var(--text); cursor: pointer; white-space: nowrap; }
+body.jb .tree .node:hover { background: #303235; }
+body.jb .tree .node.active { background: var(--select); }
+body.jb .tree .tw { width: 16px; display: inline-flex; color: var(--muted); }
+body.jb .tree .fi { display: inline-flex; color: var(--muted); }
+body.jb .tree .fi.dir { color: #8fa3bf; }
+body.jb .tree .fi.sc { color: #c77dff; }
+body.jb .tree .fi.json { color: #e0b44c; }
+body.jb .tree .fi.md { color: #6aa7e6; }
+body.jb .tree .nm { overflow: hidden; text-overflow: ellipsis; }
+body.jb .tree .badge { margin-left: auto; min-width: 16px; padding: 0 5px; border-radius: 8px; background: var(--red); color: #fff; font-size: 10.5px; text-align: center; }
+
+/* Structure (scripts du fichier) */
+.jb-structure { padding: 4px 0; }
+.jb-structure .st-item { height: 24px; display: flex; align-items: center; gap: 8px; padding: 0 12px; cursor: pointer; white-space: nowrap; overflow: hidden; }
+.jb-structure .st-item:hover { background: #303235; }
+.jb-structure .st-kind { width: 16px; height: 16px; flex: none; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #1e1f22; }
+.st-kind.hat { background: #ffbf00; }
+.st-kind.def { background: #ff6680; }
+.st-kind.msg { background: #ffab19; }
+.jb-structure .st-line { margin-left: auto; color: var(--muted); font-size: 11.5px; }
+.jb-structure .st-empty { padding: 10px 12px; color: var(--muted); }
+
+/* ---------- Éditeur ---------- */
+.jb-editor { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+body.jb .tabs { flex: none; height: 36px; display: flex; align-items: stretch; overflow-x: auto; scrollbar-width: none; background: var(--panel); border-bottom: 1px solid var(--line); }
+body.jb .tabs::-webkit-scrollbar { display: none; }
+body.jb .tab { position: relative; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 12px; border: 0; background: none; color: var(--text-2); cursor: pointer; white-space: nowrap; }
+body.jb .tab:hover { background: #303235; }
+body.jb .tab.active { color: var(--text); background: var(--bg); }
+body.jb .tab.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--accent); }
+body.jb .tab .x { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer; opacity: 0; }
+body.jb .tab:hover .x, body.jb .tab.active .x { opacity: 1; }
+body.jb .tab .x:hover { background: var(--hover); color: var(--text); }
+body.jb .tab .dot { width: 7px; height: 7px; margin: 0 5px; border-radius: 50%; background: var(--text-2); }
+.jb-editor-area { position: relative; flex: 1; min-height: 0; }
+body.jb #monaco { position: absolute; inset: 0; }
+body.jb .welcome { position: absolute; inset: 0; display: grid; place-items: center; background: var(--bg); }
+.jb-empty { display: flex; flex-direction: column; gap: 12px; color: var(--muted); font-size: 14px; }
+.jb-empty-row { display: flex; align-items: center; gap: 6px; }
+.jb-empty-row span { width: 200px; text-align: right; margin-right: 10px; }
+kbd { display: inline-block; min-width: 18px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--text-2); font: 12px "Inter", "Segoe UI", sans-serif; text-align: center; }
+.jb-inspection { position: absolute; top: 6px; right: 22px; z-index: 5; display: flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.jb-inspection:hover { background: var(--hover); }
+.jb-inspection.ok { color: var(--green); }
+.jb-inspection.err { color: var(--red); }
+.jb-gutter-run { cursor: pointer; }
+.jb-gutter-run::before { content: ''; display: block; width: 0; height: 0; margin: 4px 0 0 4px; border-left: 9px solid var(--green); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+
+/* ---------- Jeu et inspecteur ---------- */
+body.jb .game-view { position: relative; flex: none; aspect-ratio: 4 / 3; margin: 0 10px 10px; border-radius: 6px; overflow: hidden; background: #111; border: 1px solid var(--line); }
+body.jb .game-view iframe { width: 100%; height: 100%; border: 0; display: block; }
+body.jb .game-view .loading { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+body.jb .inspector { flex: 1; min-height: 0; overflow: auto; padding: 0 10px 10px; }
+body.jb .comp { margin-bottom: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); }
+body.jb .comp-head { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--line-soft); font-weight: 600; color: var(--text); }
+body.jb .comp-body { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 6px 8px; padding: 8px 10px; }
+body.jb .comp-body .lbl { color: var(--muted); }
+body.jb .comp-body .val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+body.jb .comp-body .ax { color: #e06c75; margin-right: 6px; font-weight: 700; }
+body.jb .comp-body .ay { color: #98c379; margin-right: 6px; font-weight: 700; }
+body.jb .problems, body.jb .prob, body.jb .prob-ok { display: none; }
+
+/* ---------- Fenêtre du bas ---------- */
+.jb-bottom { flex: none; height: var(--bottom-h); display: flex; flex-direction: column; background: var(--panel); border-top: 1px solid var(--line); }
+.jb-bottom-tabs { display: flex; gap: 2px; }
+.jb-bottom-tabs button { height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: none; color: var(--text-2); cursor: pointer; }
+.jb-bottom-tabs button:hover { background: var(--hover); }
+.jb-bottom-tabs button.active { background: var(--accent-soft); color: #fff; }
+.jb-count { margin-left: 4px; padding: 0 6px; border-radius: 8px; background: var(--red); color: #fff; font-size: 11px; }
+.jb-count:empty { display: none; }
+.jb-bottom-body { flex: 1; min-height: 0; overflow: auto; font: 12.5px/1.6 "JetBrains Mono", "Cascadia Code", Consolas, monospace; user-select: text; }
+.jb-run, .jb-console { padding: 6px 12px; }
+.jb-run .ln, .jb-console .ln { white-space: pre-wrap; color: var(--text-2); }
+.jb-run .ln.ok { color: var(--green); }
+.jb-run .ln.err, .jb-console .ln.err { color: var(--red); }
+.jb-run .ln.dim, .jb-console .ln.dim { color: var(--muted); }
+.jb-run .ln .who { color: #c77dff; }
+.jb-problems .pr { display: flex; align-items: center; gap: 8px; padding: 3px 12px; cursor: pointer; font-family: "Inter", "Segoe UI", sans-serif; font-size: 13px; }
+.jb-problems .pr:hover { background: #303235; }
+.jb-problems .pr .ic { color: var(--red); flex: none; }
+.jb-problems .pr .loc { color: var(--muted); }
+.jb-problems .pr-ok { padding: 10px 12px; color: var(--green); font-family: "Inter", "Segoe UI", sans-serif; }
+
+/* ---------- Barre d'état ---------- */
+.jb-status { flex: none; height: 26px; display: flex; align-items: center; gap: 2px; padding: 0 8px; background: var(--panel); border-top: 1px solid var(--line); color: var(--text-2); font-size: 12px; }
+.jb-status.running { box-shadow: inset 0 2px 0 var(--green); }
+.jb-crumbs { display: flex; align-items: center; gap: 2px; overflow: hidden; white-space: nowrap; }
+.jb-crumbs span { padding: 1px 4px; border-radius: 4px; }
+.jb-crumbs svg { color: var(--muted); }
+.jb-status .si { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.jb-status .si:hover { background: var(--hover); }
+
+/* ---------- Séparateurs redimensionnables ---------- */
+body.jb .sash { flex: none; width: 4px; margin: 0 -2px; z-index: 3; cursor: col-resize; background: transparent; }
+body.jb .sash-h { width: auto; height: 4px; margin: -2px 0; cursor: row-resize; }
+body.jb .sash:hover, body.jb .sash.drag { background: var(--accent); }
+
+/* ---------- Rechercher partout ---------- */
+.jb-popup-back { position: fixed; inset: 0; z-index: 50; display: none; background: rgba(0, 0, 0, .25); }
+.jb-popup-back.show { display: block; }
+.jb-search { position: absolute; top: 12vh; left: 50%; width: min(680px, 90vw); transform: translateX(-50%); overflow: hidden; border: 1px solid #43454a; border-radius: 10px; background: var(--panel); box-shadow: 0 18px 50px rgba(0, 0, 0, .5); }
+.jb-search-tabs { display: flex; gap: 2px; padding: 8px 8px 0; }
+.jb-search-tabs button { height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: none; color: var(--text-2); cursor: pointer; }
+.jb-search-tabs button.active { background: var(--accent-soft); color: #fff; }
+.jb-search-input { display: flex; align-items: center; gap: 8px; margin: 8px; padding: 0 10px; height: 34px; border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: var(--muted); }
+.jb-search-input input { flex: 1; border: 0; outline: none; background: none; color: var(--text); font: inherit; font-size: 14px; user-select: text; }
+.jb-search-list { max-height: 50vh; overflow-y: auto; padding: 0 0 6px; }
+.jb-search-list .group { padding: 6px 14px 2px; color: var(--muted); font-size: 11.5px; }
+.jb-search-list .it { display: flex; align-items: center; gap: 10px; height: 28px; padding: 0 14px; cursor: pointer; }
+.jb-search-list .it.sel { background: var(--select); }
+.jb-search-list .it .hint { margin-left: auto; color: var(--muted); font-size: 12px; }
+.jb-search-list .empty { padding: 14px; color: var(--muted); }
+
+/* ---------- Menus, fenêtres, notifications ---------- */
+body.jb .menu { position: fixed; z-index: 60; display: none; min-width: 230px; padding: 5px; border: 1px solid #43454a; border-radius: 8px; background: var(--panel); box-shadow: 0 12px 32px rgba(0, 0, 0, .45); }
+body.jb .menu.show { display: block; }
+body.jb .menu button { width: 100%; height: 28px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; border-radius: 5px; background: none; color: var(--text); text-align: left; cursor: pointer; }
+body.jb .menu button:hover { background: var(--accent); color: #fff; }
+body.jb .menu button .key { margin-left: auto; color: var(--muted); font-size: 12px; }
+body.jb .menu button:hover .key { color: #dbe6ff; }
+body.jb .menu .menu-title { padding: 6px 10px 4px; color: var(--muted); font-size: 11.5px; }
+body.jb .menu hr { margin: 5px 4px; border: 0; border-top: 1px solid var(--line); }
+body.jb .modal-back { background: rgba(0, 0, 0, .35); }
+body.jb .modal { border: 1px solid #43454a; border-radius: 10px; background: var(--panel); color: var(--text); }
+body.jb .field { border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); }
+body.jb .field:focus { border-color: var(--accent); outline: none; }
+body.jb .btn { border-radius: 6px; background: var(--accent); color: #fff; }
+body.jb .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--text); }
+body.jb .toast { right: 16px; bottom: 36px; left: auto; transform: none; border: 1px solid #43454a; border-radius: 8px; background: var(--panel); color: var(--text); box-shadow: 0 10px 30px rgba(0, 0, 0, .45); }

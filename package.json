@@ -1,0 +1,129 @@
+{
+  "name": "scratchcode-studio",
+  "productName": "ScratchCode Studio",
+  "version": "1.1.0",
+  "description": "ScratchCode Studio : l'application de bureau pour écrire des projets Scratch 3 en texte, dans une interface inspirée des IDE JetBrains.",
+  "main": "main.js",
+  "author": "ScratchCode",
+  "license": "MIT",
+  "homepage": "https://scratchcode.web.app",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "monaco-editor": "0.52.2"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "app.web.scratchcode.studio",
+    "productName": "ScratchCode Studio",
+    "artifactName": "ScratchCode-Studio-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**",
+      "engine/**",
+      "node_modules/monaco-editor/min/**",
+      "package.json"
+    ],
+    "fileAssociations": [
+      {
+        "ext": "scratchcode",
+        "name": "Projet ScratchCode Studio",
+        "role": "Editor"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "msi",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "ScratchCode-Studio-win-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "ScratchCode Studio",
+      "artifactName": "ScratchCode-Studio-Setup.${ext}"
+    },
+    "msi": {
+      "artifactName": "ScratchCode-Studio.${ext}"
+    },
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "identity": "-",
+      "artifactName": "ScratchCode-Studio-mac-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Development",
+      "maintainer": "ScratchCode <contact@scratchcode.web.app>",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "ScratchCode-Studio-linux-${arch}.${ext}"
+    }
+  },
+  "repository": "https://github.com/luciencard/scratchcode-studio"
+}

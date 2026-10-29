@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>ScratchCode Studio</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="ide.css">
+  <script src="bridge.js"></script>
+  <script src="icons.js"></script>
+</head>
+<body class="jb">
+  <div class="ide" id="ide">
+    <!-- Barre d'outils principale -->
+    <header class="jb-toolbar">
+      <button class="jb-tb jb-mainmenu" id="mainMenuBtn" title="Menu principal"><span data-ic="menu" data-size="18"></span></button>
+      <button class="jb-widget" id="projectWidget" title="Projets récents, nouveau projet, ouvrir">
+        <span class="jb-proj-icon" id="projIcon">SC</span>
+        <b id="tProject">Projet</b>
+        <span data-ic="chevronDown" data-size="14"></span>
+      </button>
+      <span class="jb-path" id="tPath"></span>
+      <span class="grow"></span>
+      <button class="jb-widget jb-runconfig" id="runConfig" title="Configuration d'exécution">
+        <span data-ic="gamepad" data-size="15"></span><span id="runConfigName">Jeu</span><span data-ic="chevronDown" data-size="14"></span>
+      </button>
+      <button class="jb-tb jb-run" id="runBtn" title="Lancer « Jeu » (Maj+F10)"><span data-ic="play" data-size="16"></span></button>
+      <button class="jb-tb jb-stop" id="stopBtn" title="Arrêter (Ctrl+F2)" disabled><span data-ic="stop" data-size="15"></span></button>
+      <span class="jb-sep"></span>
+      <button class="jb-tb" id="exportBtn" title="Exporter en .sb3"><span data-ic="box" data-size="17"></span></button>
+      <button class="jb-tb" id="searchBtn" title="Rechercher partout (Maj deux fois)"><span data-ic="search" data-size="17"></span></button>
+      <button class="jb-tb" id="settingsBtn" title="Paramètres"><span data-ic="settings" data-size="17"></span></button>
+    </header>
+
+    <div class="jb-main">
+      <!-- Barre latérale gauche des fenêtres d'outils -->
+      <nav class="jb-stripe">
+        <button class="jb-stripe-btn active" data-tool="project" title="Projet (Alt+1)"><span data-ic="folder" data-size="20"></span></button>
+        <button class="jb-stripe-btn" data-tool="structure" title="Structure (Alt+7)"><span data-ic="list" data-size="20"></span></button>
+        <span class="grow"></span>
+        <button class="jb-stripe-btn" data-bottom="run" title="Exécution (Alt+4)"><span data-ic="play" data-size="19"></span></button>
+        <button class="jb-stripe-btn" data-bottom="problems" title="Problèmes (Alt+6)"><span data-ic="alert" data-size="19"></span></button>
+        <button class="jb-stripe-btn" data-bottom="console" title="Journal (Alt+F12)"><span data-ic="terminal" data-size="19"></span></button>
+      </nav>
+
+      <div class="jb-center" id="wb">
+        <div class="jb-row">
+          <!-- Fenêtre d'outils gauche : Projet / Structure -->
+          <aside class="jb-tool jb-left" id="toolLeft">
+            <div class="jb-tool-head">
+              <span class="jb-tool-title" id="leftTitle">Projet</span>
+              <span class="grow"></span>
+              <button class="jb-icon-btn" id="newSprite" title="Nouveau lutin"><span data-ic="plus" data-size="15"></span></button>
+              <button class="jb-icon-btn" id="refreshTree" title="Actualiser depuis le disque"><span data-ic="refresh" data-size="14"></span></button>
+              <button class="jb-icon-btn" data-hide="left" title="Masquer"><span data-ic="minus" data-size="15"></span></button>
+            </div>
+            <div class="jb-tool-body">
+              <div class="tree" id="tree"></div>
+              <div class="jb-structure" id="structure" hidden></div>
+            </div>
+          </aside>
+          <div class="sash" data-sash="side"></div>
+
+          <!-- Éditeur -->
+          <section class="jb-editor">
+            <div class="tabs" id="tabs"></div>
+            <div class="jb-editor-area">
+              <div id="monaco"></div>
+              <div class="jb-inspection" id="inspection" title="Inspections du fichier"></div>
+              <div class="welcome" id="welcome">
+                <div class="jb-empty">
+                  <div class="jb-empty-row"><span>Rechercher partout</span><kbd>Maj</kbd><kbd>Maj</kbd></div>
+                  <div class="jb-empty-row"><span>Aller au fichier</span><kbd>Ctrl</kbd><kbd>Maj</kbd><kbd>N</kbd></div>
+                  <div class="jb-empty-row"><span>Fichiers récents</span><kbd>Ctrl</kbd><kbd>E</kbd></div>
+                  <div class="jb-empty-row"><span>Lancer le jeu</span><kbd>Maj</kbd><kbd>F10</kbd></div>
+                  <div class="jb-empty-row"><span>Nouveau lutin</span><kbd>Alt</kbd><kbd>Insér</kbd></div>
+                </div>
+              </div>
+            </div>
+          </section>
+          <div class="sash" data-sash="game"></div>
+
+          <!-- Fenêtres d'outils droites : Jeu + Inspecteur -->
+          <aside class="jb-tool jb-right" id="toolRight">
+            <div class="jb-tool-head">
+              <span class="jb-tool-title">Jeu</span><span class="jb-dim">480 × 360</span>
+              <span class="grow"></span>
+              <button class="jb-icon-btn" id="gameRun" title="Lancer"><span data-ic="flag" data-size="14"></span></button>
+              <button class="jb-icon-btn" data-hide="right" title="Masquer"><span data-ic="minus" data-size="15"></span></button>
+            </div>
+            <div class="game-view">
+              <div class="loading" id="engineLoading">Chargement du moteur Scratch…</div>
+              <iframe id="engine" src="/index.html?studio=1" title="Scène"></iframe>
+            </div>
+            <div class="jb-tool-head jb-sub"><span class="jb-tool-title">Inspecteur</span></div>
+            <div class="inspector" id="inspector"></div>
+          </aside>
+        </div>
+
+        <!-- Fenêtre d'outils du bas : Exécution / Problèmes / Journal -->
+        <div class="sash sash-h" data-sash="bottom"></div>
+        <section class="jb-bottom" id="toolBottom" hidden>
+          <div class="jb-tool-head">
+            <div class="jb-bottom-tabs">
+              <button data-btab="run">Exécution</button>
+              <button data-btab="problems">Problèmes <span class="jb-count" id="probCount"></span></button>
+              <button data-btab="console">Journal</button>
+            </div>
+            <span class="grow"></span>
+            <button class="jb-icon-btn" id="clearConsole" title="Effacer"><span data-ic="trash" data-size="14"></span></button>
+            <button class="jb-icon-btn" data-hide="bottom" title="Masquer"><span data-ic="minus" data-size="15"></span></button>
+          </div>
+          <div class="jb-bottom-body">
+            <div class="jb-run" id="runPanel"></div>
+            <div class="jb-problems" id="problemsPanel" hidden></div>
+            <div class="jb-console" id="consolePanel" hidden></div>
+          </div>
+        </section>
+      </div>
+
+      <nav class="jb-stripe jb-stripe-right">
+        <button class="jb-stripe-btn active" data-tool="game" title="Jeu"><span data-ic="gamepad" data-size="20"></span></button>
+        <button class="jb-stripe-btn" data-tool="settings" title="Ouvrir le dossier du projet" id="actReveal"><span data-ic="external" data-size="19"></span></button>
+      </nav>
+    </div>
+
+    <footer class="jb-status" id="status">
+      <span class="jb-crumbs" id="crumb"></span>
+      <span class="grow"></span>
+      <span class="si" id="sState"></span>
+      <span class="si" id="sWatch"><span data-ic="refresh" data-size="12"></span><span>Synchronisé avec le disque</span></span>
+      <span class="si" id="sCursor">1:1</span>
+      <span class="si">LF</span>
+      <span class="si">UTF-8</span>
+      <span class="si">4 espaces</span>
+      <span class="si" id="sLang">ScratchCode</span>
+    </footer>
+  </div>
+
+  <!-- Rechercher partout / Rechercher une action -->
+  <div class="jb-popup-back" id="searchBack">
+    <div class="jb-search">
+      <div class="jb-search-tabs" id="searchTabs">
+        <button data-scope="all" class="active">Tout</button>
+        <button data-scope="files">Fichiers</button>
+        <button data-scope="symbols">Scripts</button>
+        <button data-scope="actions">Actions</button>
+      </div>
+      <div class="jb-search-input"><span data-ic="search" data-size="16"></span><input id="searchInput" spellcheck="false" autocomplete="off" placeholder="Tape pour rechercher"></div>
+      <div class="jb-search-list" id="searchList"></div>
+    </div>
+  </div>
+
+  <div class="menu" id="menu"></div>
+  <div class="modal-back" id="modalBack"><div class="modal"><h3 id="modalTitle"></h3><input class="field" id="modalInput" spellcheck="false"><div class="row"><button class="btn ghost" id="modalCancel">Annuler</button><button class="btn" id="modalOk">OK</button></div></div></div>
+  <div class="toast" id="toast"></div>
+
+  <script src="/monaco/vs/loader.js"></script>
+  <script src="editor.js"></script>
+</body>
+</html>
