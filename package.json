@@ -1,7 +1,7 @@
-﻿{
+{
   "name": "scratchcode-studio",
   "productName": "ScratchCode Studio",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "ScratchCode Studio : un moteur de jeu 2D, 3D et d'applications où le code s'écrit en ScratchCode (blocs Scratch en texte).",
   "main": "main.js",
   "author": "ScratchCode",
