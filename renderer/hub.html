@@ -1,11 +1,29 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>Bienvenue dans ScratchCode Studio</title>
+  <title>ScratchCode Studio</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="ide.css">
   <link rel="stylesheet" href="hub.css">
+  <style>
+    .wl-proj .p-type { flex: none; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; background: #3b2d63; color: #cbb6ff; }
+    .wl-proj .p-type.t3d { background: #213d63; color: #9cc5ff; }
+    .wl-proj .p-type.tapp { background: #5a2440; color: #ffadcf; }
+    .wl-proj .p-x { opacity: 0; width: 26px; height: 26px; border: 0; border-radius: 5px; background: none; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .wl-proj:hover .p-x { opacity: 1; }
+    .wl-proj .p-x:hover { background: var(--hover); color: var(--text); }
+    .wl-dialog { width: min(900px, 94vw); height: min(560px, 90vh); }
+    .tp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-bottom: 6px; }
+    .tp { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 2px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); text-align: left; cursor: pointer; }
+    .tp:hover { border-color: #4a4d55; }
+    .tp.sel { border-color: var(--accent); background: #1d2433; }
+    .tp .tp-art { height: 70px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; }
+    .tp b { font-weight: 600; }
+    .tp span { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .wl-form { overflow: auto; }
+    .wl-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  </style>
   <script src="bridge.js"></script>
   <script src="icons.js"></script>
 </head>
@@ -13,8 +31,8 @@
   <div class="wl">
     <aside class="wl-side">
       <div class="wl-brand">
-        <img src="/favicon.svg" width="40" height="40" alt="">
-        <div><b>ScratchCode Studio</b><span id="ver">1.1.0</span></div>
+        <img src="logo.svg" width="40" height="40" alt="">
+        <div><b>ScratchCode Studio</b><span id="ver">1.2.1</span></div>
       </div>
       <button class="wl-nav active" data-panel="projects">Projets</button>
       <button class="wl-nav" data-panel="learn">Apprendre</button>
@@ -22,56 +40,54 @@
     </aside>
 
     <main class="wl-main">
-      <!-- Projets -->
       <section class="wl-panel active" id="panel-projects">
         <div class="wl-top">
           <div class="wl-search"><span data-ic="search" data-size="15"></span><input id="projSearch" placeholder="Rechercher des projets" spellcheck="false"></div>
-          <button class="wl-btn primary" id="goNew">Nouveau projet</button>
-          <button class="wl-btn" id="openBtn">Ouvrir</button>
+          <button class="wl-btn" id="openBtn"><span data-ic="folderOpen" data-size="15"></span>Ouvrir</button>
+          <button class="wl-btn primary" id="goNew"><span data-ic="plus" data-size="15"></span>Nouveau projet</button>
         </div>
         <div id="recent"></div>
       </section>
 
-      <!-- Apprendre -->
       <section class="wl-panel" id="panel-learn">
-        <h1>Apprendre ScratchCode</h1>
+        <h1>Apprendre ScratchCode Studio</h1>
         <div class="wl-learn">
-          <div class="wl-card"><b>Un fichier par lutin</b><p>Chaque projet est un dossier. Le code de chaque lutin est dans <code>sprites/Nom.sc</code>, celui de la scène dans <code>stage.sc</code>. Le fichier <code>.sb3</code> est régénéré à chaque exécution.</p></div>
-          <div class="wl-card"><b>Raccourcis essentiels</b><p><kbd>Maj</kbd> <kbd>Maj</kbd> rechercher partout · <kbd>Maj</kbd>+<kbd>F10</kbd> lancer · <kbd>Ctrl</kbd>+<kbd>F2</kbd> arrêter · <kbd>Ctrl</kbd>+<kbd>E</kbd> fichiers récents · <kbd>Alt</kbd>+<kbd>Insér</kbd> nouveau lutin</p></div>
-          <div class="wl-card"><b>Syntaxe</b><p>Un bloc par ligne, quatre espaces pour l'intérieur d'une boucle, <code>end</code> pour la fermer. Le guide complet est dans <code>SCRATCHCODE.md</code>, dans chaque projet.</p></div>
+          <div class="wl-card"><b>Trois types de projets</b><p><b>2D</b> : la scène Scratch, des lutins et leurs costumes. <b>3D</b> : une scène en trois dimensions avec des objets, des lumières, une caméra, la physique et des modèles importés. <b>Application</b> : des boutons, des textes et des champs de saisie.</p></div>
+          <div class="wl-card"><b>Comme dans un moteur de jeu</b><p>À gauche la <b>Hiérarchie</b> (les objets de la scène), au centre les vues <b>Scène</b> et <b>Jeu</b>, à droite l'<b>Inspecteur</b> (position, couleur, physique, script), en bas le panneau <b>Projet</b> (tes fichiers) et la <b>Console</b>. Le bouton Lecture en haut lance le jeu.</p></div>
+          <div class="wl-card"><b>Le code</b><p>Chaque objet peut avoir un script <code>.sc</code> écrit en ScratchCode. Le premier bloc d'un script est souvent <code>when app run</code>, qui remplace le drapeau vert. En 3D, de nouveaux blocs déplacent les objets : <code>move forward (0.1)</code>, <code>jump with force (6)</code>, <code>camera follow [myself] distance (7) height (3)</code>...</p></div>
+          <div class="wl-card"><b>Importer des assets</b><p>Glisse tes fichiers dans le panneau Projet, ou clique sur Importer : modèles 3D <code>.glb</code> <code>.gltf</code> <code>.obj</code> <code>.fbx</code> <code>.stl</code> <code>.ply</code> <code>.dae</code>, images et sons. Glisse ensuite un modèle dans la vue Scène pour l'ajouter.</p></div>
+          <div class="wl-card"><b>Raccourcis essentiels</b><p><kbd>Ctrl</kbd>+<kbd>P</kbd> lancer ou arrêter · <kbd>Ctrl</kbd>+<kbd>S</kbd> enregistrer · <kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler · <kbd>Ctrl</kbd>+<kbd>D</kbd> dupliquer · <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> déplacer, pivoter, redimensionner · <kbd>F</kbd> cadrer la sélection</p></div>
+          <div class="wl-card"><b>Partager un projet</b><p>Fichier &gt; Exporter crée un seul fichier <code>.scratchcode</code> avec tout le projet. Pour l'ouvrir sur un autre ordinateur : bouton Ouvrir, ou double-clic sur le fichier.</p></div>
         </div>
       </section>
     </main>
   </div>
 
-  <!-- Nouveau projet -->
   <div class="wl-dialog-back" id="newBack">
     <div class="wl-dialog">
       <div class="wl-dialog-head">Nouveau projet</div>
       <div class="wl-dialog-body">
-        <div class="wl-gens" id="gens">
-          <div class="wl-gens-title">Modèles</div>
-          <button class="wl-gen sel" data-tpl="vide"><span class="g-ic" style="background:#4c97ff" data-ic="box" data-size="15"></span>Projet vide</button>
-          <button class="wl-gen" data-tpl="plateforme"><span class="g-ic" style="background:#59c059" data-ic="layers" data-size="15"></span>Plateforme 2D</button>
-          <button class="wl-gen" data-tpl="arcade"><span class="g-ic" style="background:#ff8c1a" data-ic="gamepad" data-size="15"></span>Arcade</button>
+        <div class="wl-gens" id="types">
+          <div class="wl-gens-title">Type de projet</div>
+          <button class="wl-gen sel" data-type="2d"><span class="g-ic" style="background:#855cd6" data-ic="image" data-size="14"></span>2D</button>
+          <button class="wl-gen" data-type="3d"><span class="g-ic" style="background:#3d7bd9" data-ic="box" data-size="14"></span>3D</button>
+          <button class="wl-gen" data-type="app"><span class="g-ic" style="background:#e6457a" data-ic="app" data-size="14"></span>Application</button>
         </div>
         <div class="wl-form">
-          <p class="wl-desc" id="tplDesc"></p>
-          <label for="pName">Nom</label>
-          <input class="field" id="pName" value="MonJeu" spellcheck="false">
-          <label for="pLoc">Emplacement</label>
-          <div class="loc-row">
-            <input class="field" id="pLoc" spellcheck="false">
-            <button class="wl-btn" id="pickLoc" title="Parcourir"><span data-ic="folder" data-size="15"></span></button>
+          <div class="tp-grid" id="tpl"></div>
+          <div class="wl-cols">
+            <div style="display:flex;flex-direction:column;gap:6px"><label for="pName">Nom</label><input class="field" id="pName" value="MonJeu" spellcheck="false"></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><label for="pLoc">Emplacement</label>
+              <div class="loc-row"><input class="field" id="pLoc" spellcheck="false"><button class="wl-btn" id="pickLoc" title="Parcourir"><span data-ic="folder" data-size="15"></span></button></div></div>
           </div>
           <div class="path-preview" id="pathPreview"></div>
-          <div class="wl-note">Le projet est enregistré au format <b>.sb3</b>, compatible avec Scratch, TurboWarp et ScratchCode.</div>
+          <div class="wl-note">Le projet est un dossier : scènes, scripts <b>.sc</b> et assets. Il s'exporte en un seul fichier <b>.scratchcode</b>.</div>
         </div>
       </div>
       <div class="wl-dialog-foot">
         <span class="grow"></span>
         <button class="wl-btn" id="cancelNew">Annuler</button>
-        <button class="wl-btn primary" id="createBtn">Créer</button>
+        <button class="wl-btn primary" id="createBtn">Créer le projet</button>
       </div>
     </div>
   </div>
@@ -82,14 +98,24 @@
     const $ = s => document.querySelector(s);
     const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     const sep = studio.platform === 'win32' ? '\\' : '/';
-    const DESC = {
-      vide: 'Une scène et un lutin, prêts à recevoir ton code.',
-      plateforme: 'Un joueur avec gravité, saut et déplacements au clavier.',
-      arcade: 'Un vaisseau qui suit la souris et tire des lasers (clones).'
+    const TEMPLATES = {
+      '2d': [
+        { id: 'vide', name: 'Projet 2D vide', desc: 'Une scène et un lutin, prêts à recevoir ton code.', color: '#855cd6', ic: 'sprite', file: 'MonJeu' },
+        { id: 'plateforme', name: 'Plateforme', desc: 'Un joueur avec gravité, saut et déplacements.', color: '#59c059', ic: 'layers', file: 'Plateforme' },
+        { id: 'arcade', name: 'Arcade', desc: 'Un vaisseau qui suit la souris et tire des lasers.', color: '#ff8c1a', ic: 'rocket', file: 'Arcade' }
+      ],
+      '3d': [
+        { id: 'vide', name: 'Projet 3D vide', desc: 'Une caméra, un sol et un cube qui tourne.', color: '#3d7bd9', ic: 'box', file: 'MonJeu3D' },
+        { id: 'aventure', name: 'Aventure 3D', desc: 'Un personnage en vue à la troisième personne, des plateformes et 5 pièces à ramasser.', color: '#0fbd8c', ic: 'gamepad', file: 'Aventure' },
+        { id: 'fps', name: 'Première personne', desc: 'Caméra subjective, visée à la souris et cibles à toucher.', color: '#d9534f', ic: 'camera', file: 'Cibles' }
+      ],
+      app: [
+        { id: 'vide', name: 'Application', desc: 'Un titre, un champ de saisie et un bouton.', color: '#e6457a', ic: 'app', file: 'MonApp' },
+        { id: 'quiz', name: 'Quiz', desc: 'Une question, trois réponses et un score.', color: '#cf63cf', ic: 'list', file: 'Quiz' }
+      ]
     };
     const COLORS = ['#4c97ff', '#9966ff', '#59c059', '#ff8c1a', '#ff6680', '#0fbd8c', '#cf63cf', '#5cb1d6'];
-    let template = 'vide';
-    let projects = [];
+    let type = '2d', template = 'vide', projects = [], nameTouched = false;
 
     function toast(msg, err) {
       const t = $('#toast');
@@ -103,7 +129,6 @@
       document.querySelectorAll('.wl-nav').forEach(x => x.classList.toggle('active', x === b));
       document.querySelectorAll('.wl-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + b.dataset.panel));
     });
-
     function ago(t) {
       const m = Math.round((Date.now() - t) / 60000);
       if (m < 1) return "à l'instant"; if (m < 60) return `il y a ${m} min`;
@@ -115,39 +140,67 @@
       const list = projects.filter(p => !q || p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q));
       const box = $('#recent');
       if (!projects.length) {
-        box.innerHTML = `<div class="wl-empty"><b>Bienvenue dans ScratchCode Studio</b><p>Crée un nouveau projet pour commencer, ou ouvre un dossier de projet existant.</p></div>`;
+        box.innerHTML = `<div class="wl-empty"><b>Bienvenue dans ScratchCode Studio</b><p>Crée un projet 2D, 3D ou une application pour commencer,<br>ou ouvre un projet existant.</p></div>`;
         return;
       }
-      box.innerHTML = list.length ? list.map((p, i) => `
-        <div class="wl-proj" data-path="${esc(p.path)}">
+      box.innerHTML = list.length ? list.map(p => {
+        const t = p.type === '3d' ? '3D' : p.type === 'app' ? 'APP' : '2D';
+        return `<div class="wl-proj" data-path="${esc(p.path)}">
           <span class="p-ic" style="background:${COLORS[[...p.name].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length]}">${esc(p.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'SC')}</span>
           <div class="p-text"><b>${esc(p.name)}</b><span>${esc(p.path)}</span></div>
-          <span class="p-time">${ago(p.openedAt)}</span>
-        </div>`).join('') : '<div class="wl-empty"><p>Aucun projet ne correspond à cette recherche.</p></div>';
-      box.querySelectorAll('.wl-proj').forEach(el => el.onclick = () => studio.openProject(el.dataset.path).catch(e => toast(clean(e), true)));
+          <span class="p-time">${ago(p.openedAt)}</span><span class="p-type ${p.type === '3d' ? 't3d' : p.type === 'app' ? 'tapp' : ''}">${t}</span>
+          <button class="p-x" title="Retirer de la liste (le dossier n'est pas supprimé)">${icon('x', 14)}</button>
+        </div>`;
+      }).join('') : '<div class="wl-empty"><p>Aucun projet ne correspond à cette recherche.</p></div>';
+      box.querySelectorAll('.wl-proj').forEach(el => el.onclick = async e => {
+        if (e.target.closest('.p-x')) { await studio.removeRecent(el.dataset.path); projects = projects.filter(p => p.path !== el.dataset.path); renderRecent(); return; }
+        studio.openProject(el.dataset.path).catch(err => toast(clean(err), true));
+      });
     }
     $('#projSearch').oninput = renderRecent;
-
-    async function openFolder() {
-      const dir = await studio.pickFolder('Ouvrir un projet ScratchCode');
-      if (dir) studio.openProject(dir).catch(e => toast(clean(e), true));
-    }
-    $('#openBtn').onclick = openFolder;
+    $('#openBtn').onclick = async () => {
+      const r = $('#openBtn').getBoundingClientRect();
+      const choice = await new Promise(res => {
+        const m = document.createElement('div');
+        m.className = 'menu show';
+        m.style.cssText = `position:fixed;left:${r.left}px;top:${r.bottom + 4}px;z-index:60`;
+        m.innerHTML = `<button data-c="folder">${icon('folderOpen', 14)}<span>Ouvrir un dossier de projet…</span></button><button data-c="file">${icon('box', 14)}<span>Ouvrir un fichier .scratchcode…</span></button>`;
+        document.body.appendChild(m);
+        const close = c => { m.remove(); removeEventListener('mousedown', out, true); res(c); };
+        const out = e => { if (!m.contains(e.target)) close(null); };
+        setTimeout(() => addEventListener('mousedown', out, true));
+        m.querySelectorAll('button').forEach(b => b.onclick = () => close(b.dataset.c));
+      });
+      try {
+        if (choice === 'folder') { const dir = await studio.pickFolder('Ouvrir un projet ScratchCode'); if (dir) await studio.openProject(dir); }
+        else if (choice === 'file') await studio.openAny();
+      } catch (e) { toast(clean(e), true); }
+    };
 
     const preview = () => $('#pathPreview').textContent = ($('#pLoc').value.replace(/[\\/]$/, '') + sep + ($('#pName').value.trim() || 'MonProjet'));
-    function selectTpl(t) {
-      template = t;
-      document.querySelectorAll('.wl-gen').forEach(x => x.classList.toggle('sel', x.dataset.tpl === t));
-      $('#tplDesc').textContent = DESC[t];
+    function renderTemplates() {
+      $('#tpl').innerHTML = TEMPLATES[type].map(t => `<button class="tp${t.id === template ? ' sel' : ''}" data-tpl="${t.id}">
+        <div class="tp-art" style="background:linear-gradient(135deg, ${t.color}, ${t.color}aa)">${icon(t.ic, 30)}</div><b>${esc(t.name)}</b><span>${esc(t.desc)}</span></button>`).join('');
+      $('#tpl').querySelectorAll('.tp').forEach(b => b.onclick = () => { template = b.dataset.tpl; renderTemplates(); suggestName(); });
     }
-    document.querySelectorAll('.wl-gen').forEach(b => b.onclick = () => selectTpl(b.dataset.tpl));
-    $('#goNew').onclick = () => { $('#newBack').classList.add('show'); $('#pName').focus(); $('#pName').select(); };
+    function suggestName() {
+      if (nameTouched) return;
+      const t = TEMPLATES[type].find(x => x.id === template);
+      $('#pName').value = t ? t.file : 'MonJeu'; preview();
+    }
+    document.querySelectorAll('[data-type]').forEach(b => b.onclick = () => {
+      type = b.dataset.type; template = TEMPLATES[type][0].id;
+      document.querySelectorAll('[data-type]').forEach(x => x.classList.toggle('sel', x === b));
+      renderTemplates(); suggestName();
+    });
+    $('#goNew').onclick = () => { $('#newBack').classList.add('show'); nameTouched = false; suggestName(); $('#pName').focus(); $('#pName').select(); };
     $('#cancelNew').onclick = () => $('#newBack').classList.remove('show');
-    $('#pName').oninput = preview; $('#pLoc').oninput = preview;
+    $('#pName').oninput = () => { nameTouched = true; preview(); };
+    $('#pLoc').oninput = preview;
     $('#pickLoc').onclick = async () => { const d = await studio.pickFolder("Choisir l'emplacement du projet"); if (d) { $('#pLoc').value = d; preview(); } };
     $('#createBtn').onclick = async () => {
       const btn = $('#createBtn'); btn.disabled = true;
-      try { await studio.createProject({ parentDir: $('#pLoc').value, name: $('#pName').value, template, exportFormat: 'sb3' }); }
+      try { await studio.createProject({ parentDir: $('#pLoc').value, name: $('#pName').value, type, template }); }
       catch (e) { toast(clean(e), true); btn.disabled = false; }
     };
     document.addEventListener('keydown', e => {
@@ -155,7 +208,8 @@
       if (e.key === 'Enter' && $('#newBack').classList.contains('show')) $('#createBtn').click();
     });
 
-    selectTpl('vide');
+    renderTemplates();
+    studio.version().then(v => { $('#ver').textContent = v; });
     studio.defaultLocation().then(d => { $('#pLoc').value = d; preview(); });
     studio.recent().then(list => { projects = list; renderRecent(); });
   </script>

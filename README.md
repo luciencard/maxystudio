@@ -1,10 +1,14 @@
 # ScratchCode Studio
 
-L'application de bureau de [ScratchCode](https://scratchcode.web.app) pour écrire des projets Scratch 3 en texte.
+Le moteur de jeu de [ScratchCode](https://scratchcode.web.app) : des projets 2D, 3D ou des applications, avec le code écrit en ScratchCode (les blocs Scratch en texte).
 
-Chaque projet est un dossier : un fichier `.sc` par lutin, un fichier `stage.sc` pour la scène, et un fichier `.sb3` régénéré à chaque exécution. Le `.sb3` s'ouvre dans ScratchCode, Scratch et TurboWarp.
+## Ce qu'il y a dedans
 
-L'interface reprend l'organisation des IDE JetBrains : écran d'accueil avec les projets récents, fenêtres d'outils (Projet, Structure, Jeu, Inspecteur, Exécution, Problèmes, Journal), recherche partout et raccourcis clavier.
+- **Trois types de projets** : 2D (la scène Scratch et ses lutins), 3D (objets, lumières, caméra, physique, modèles importés) et Application (boutons, textes, champs de saisie).
+- **Un éditeur organisé comme les grands moteurs** : Hiérarchie, vue Scène avec outils Déplacer, Pivoter et Redimensionner, vue Jeu, Inspecteur avec composants (Rendu, Lumière, Caméra, Collision, Physique, Script), panneau Projet, Console, boutons Lecture, Pause et Image suivante, Annuler et Rétablir.
+- **Le code** : un script `.sc` par objet. `when app run` remplace le drapeau vert. Les projets 3D ont plus de 50 nouveaux blocs (`move forward (0.1)`, `jump with force (6)`, `camera follow [myself] distance (7) height (3)`...).
+- **Les assets** : modèles `.glb` `.gltf` `.obj` `.fbx` `.stl` `.ply` `.dae` (avec leurs animations), images et sons, à glisser dans le panneau Projet.
+- **Le format `.scratchcode`** : un projet est un dossier (`project.scratchcode`, `scenes/`, `scripts/`, `assets/`), et Exporter le transforme en un seul fichier `.scratchcode` à partager.
 
 ## Télécharger
 
@@ -14,14 +18,14 @@ Les installateurs pour Windows, macOS et Linux sont sur la [page de télécharge
 
 | Action | Raccourci |
 | --- | --- |
-| Rechercher partout | `Maj` `Maj` |
-| Aller au fichier | `Ctrl` + `Maj` + `N` |
-| Rechercher une action | `Ctrl` + `Maj` + `A` |
-| Fichiers récents | `Ctrl` + `E` |
-| Lancer le jeu | `Maj` + `F10` |
-| Arrêter | `Ctrl` + `F2` |
-| Nouveau lutin | `Alt` + `Insér` |
-| Fenêtres Projet, Exécution, Problèmes, Structure | `Alt` + `1`, `4`, `6`, `7` |
+| Lancer ou arrêter | `Ctrl` + `P` |
+| Pause / image suivante | `Ctrl` + `Maj` + `P` / `Ctrl` + `Alt` + `P` |
+| Tout enregistrer | `Ctrl` + `S` |
+| Annuler / rétablir | `Ctrl` + `Z` / `Ctrl` + `Y` |
+| Dupliquer, supprimer, renommer | `Ctrl` + `D`, `Suppr`, `F2` |
+| Outils Main, Déplacer, Pivoter, Redimensionner | `Q`, `W`, `E`, `R` |
+| Cadrer la sélection | `F` |
+| Se déplacer dans la scène | clic droit + `ZQSD` / `WASD` |
 
 ## Développer
 
@@ -34,6 +38,6 @@ Pour publier une version, pousse un tag `vX.Y.Z` : GitHub Actions compile les in
 
 ## Licences
 
-Le code de ScratchCode Studio est sous licence MIT. Le moteur Scratch (scratch-vm, scratch-render, scratch-storage) appartient à la Scratch Foundation et reste soumis à ses propres licences. La police JetBrains Mono est distribuée sous licence SIL Open Font 1.1 (`renderer/fonts/JetBrainsMono-OFL.txt`).
+Le code de ScratchCode Studio est sous licence MIT. Le moteur Scratch (scratch-vm, scratch-render, scratch-storage) appartient à la Scratch Foundation et reste soumis à ses propres licences. Le moteur 3D utilise [three.js](https://threejs.org) (licence MIT). La police JetBrains Mono est distribuée sous licence SIL Open Font 1.1 (`renderer/fonts/JetBrainsMono-OFL.txt`).
 
 ScratchCode est un projet indépendant, ni affilié à la Scratch Foundation ni au MIT, ni approuvé par eux.

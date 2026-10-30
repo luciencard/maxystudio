@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Logo de ScratchCode Studio : un cube (le moteur 2D/3D) avec le bouton Lecture -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2540"/>
+      <stop offset="1" stop-color="#0d1222"/>
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8fd3ff"/>
+      <stop offset="1" stop-color="#4fa3f7"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a7ee0"/>
+      <stop offset="1" stop-color="#2557b8"/>
+    </linearGradient>
+    <linearGradient id="right" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a5fc4"/>
+      <stop offset="1" stop-color="#173b8a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".55" r=".5">
+      <stop offset="0" stop-color="#3fa2ff" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#3fa2ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="280" r="230" fill="url(#glow)"/>
+  <g stroke="#0d1222" stroke-width="6" stroke-linejoin="round">
+    <path d="M256 92 L408 176 L256 260 L104 176 Z" fill="url(#top)"/>
+    <path d="M104 176 L256 260 L256 432 L104 348 Z" fill="url(#left)"/>
+    <path d="M408 176 L256 260 L256 432 L408 348 Z" fill="url(#right)"/>
+  </g>
+  <path d="M234 162 Q256 150 278 162 L300 174 Q306 178 300 182 L278 194 Q256 206 234 194 L212 182 Q206 178 212 174 Z" fill="#ffbf3c" stroke="#0d1222" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M300 268 L362 300 Q372 306 362 314 L300 360 Q290 367 290 355 L290 276 Q290 263 300 268 Z" fill="#ffffff"/>
+  <path d="M148 272 L196 298 M148 300 L216 336 M148 328 L184 348" stroke="#cfe6ff" stroke-width="14" stroke-linecap="round" opacity=".9"/>
+</svg>
