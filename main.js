@@ -107,6 +107,8 @@ function resolveAppPath(urlPath) {
   const p = decodeURIComponent(urlPath);
   if (p.startsWith('/studio/')) return path.join(UI_DIR, p.slice('/studio/'.length));
   if (p.startsWith('/monaco/')) return path.join(MONACO_DIR, p.slice('/monaco/'.length));
+  // Les modules « examples » de three.js sont copiés dans vendor/ : electron-builder exclut les dossiers examples de node_modules.
+  if (p.startsWith('/three/examples/jsm/')) return path.join(ROOT, 'vendor', 'three-addons', p.slice('/three/examples/jsm/'.length));
   if (p.startsWith('/three/')) return path.join(THREE_DIR, p.slice('/three/'.length));
   if (p.startsWith('/project/')) {
     const [, , key, ...rest] = p.split('/');
@@ -172,12 +174,35 @@ async function createProject({ parentDir, name, type, template }) {
 
 // Les projets 1.0 / 1.1 (stage.sc + sprites/*.sc + .sb3) deviennent des projets 2D avec une scène.
 async function migrate(dir, config) {
-  if (config.version >= 2 && fs.existsSync(path.join(dir, config.mainScene || 'scenes/Main.scene'))) return config;
+  const scenePath = path.join(dir, config.mainScene || 'scenes/Main.scene');
+  if (config.version >= 2 && fs.existsSync(scenePath)) {
+    // Projets convertis par la 1.2.2 : leurs lutins n'avaient pas reçu de costume
+    if (config.migratedFrom) {
+      try {
+        const scene = JSON.parse(await fsp.readFile(scenePath, 'utf8'));
+        const bare = (scene.objects || []).filter(o => o.kind === 'sprite' && !(o.costumes || []).length);
+        if (bare.length) {
+          if (!fs.existsSync(path.join(dir, 'assets', 'Lutin.svg'))) {
+            await fsp.mkdir(path.join(dir, 'assets'), { recursive: true });
+            await fsp.writeFile(path.join(dir, 'assets', 'Lutin.svg'), T.SVG.lutin);
+          }
+          for (const o of bare) o.costumes = ['assets/Lutin.svg'];
+          await fsp.writeFile(scenePath, JSON.stringify(scene, null, 2));
+        }
+      } catch { /* scène illisible : l'éditeur affichera l'erreur */ }
+    }
+    return config;
+  }
   const spritesDir = path.join(dir, 'sprites');
   const names = fs.existsSync(spritesDir) ? (await fsp.readdir(spritesDir)).filter(f => f.endsWith('.sc')).map(f => f.slice(0, -3)) : [];
   const scene = T.legacyScene(names, fs.existsSync(path.join(dir, 'stage.sc')));
   await fsp.mkdir(path.join(dir, 'scenes'), { recursive: true });
   await fsp.mkdir(path.join(dir, 'assets'), { recursive: true });
+  // Les anciens lutins n'avaient pas de costume enregistré : ils reçoivent le costume par défaut
+  if (names.length) {
+    if (!fs.existsSync(path.join(dir, 'assets', 'Lutin.svg'))) await fsp.writeFile(path.join(dir, 'assets', 'Lutin.svg'), T.SVG.lutin);
+    for (const o of scene.objects) o.costumes = ['assets/Lutin.svg'];
+  }
   await fsp.writeFile(path.join(dir, 'scenes', 'Main.scene'), JSON.stringify(scene, null, 2));
   const next = { format: 'scratchcode', version: 2, engine: '1.2', name: config.name || path.basename(dir), type: '2d', mainScene: 'scenes/Main.scene', settings: { title: config.title || config.name }, created: config.created || new Date().toISOString(), migratedFrom: config.version || 1 };
   await fsp.writeFile(path.join(dir, 'project.scratchcode'), JSON.stringify(next, null, 2));

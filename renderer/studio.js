@@ -1004,11 +1004,19 @@ function waitEngine(timeout = 30000) {
     })();
   });
 }
+// Le moteur charge d'abord son propre projet de démarrage : on attend qu'il ait fini avant de lancer le jeu.
+let engineSettled = null;
+const settleEngine = sc => engineSettled || (engineSettled = (async () => {
+  const t0 = Date.now();
+  while (!sc.vm.runtime.targets.length && Date.now() - t0 < 15000) await new Promise(r => setTimeout(r, 100));
+  await new Promise(r => setTimeout(r, 1200));
+})());
 frame.addEventListener('load', async () => {
   const doc = frame.contentDocument;
   const st = doc.createElement('style'); st.textContent = ENGINE_CSS; doc.head.appendChild(st);
   try {
     const sc = await waitEngine();
+    await settleEngine(sc);
     $('#engineLoading').style.display = 'none';
     sc.vm.runtime.on('SAY', (target, type, text) => { if (S.mode !== 'edit' && text !== '' && text != null) log('log', `${type === 'think' ? 'pense' : 'dit'} : ${text}`, { who: target.getName() }); });
     sc.vm.runtime.on('SC_PRINT', m => log(m.level === 'error' ? 'error' : 'log', m.text, { who: m.who }));
@@ -1048,6 +1056,7 @@ async function play() {
     if (S.clearOnPlay) clearLogs();
     status('Compilation…');
     const sc = await waitEngine();
+    await settleEngine(sc);
     sc.vm.stopAll();
     const b64 = await studio.playArchive(DIR, playSpec());
     const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
