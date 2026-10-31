@@ -162,11 +162,17 @@
     for (const ax of ['x', 'y', 'z']) {
       const d = delta[ax];
       if (!d) continue;
+      // Un objet déjà chevauché avant ce mouvement (par exemple un cube qui tourne sous la balle)
+      // ne repousse pas sur les côtés : sinon l'objet serait éjecté de plus en plus loin.
+      const before = core.worldBox(obj);
+      const overlapping = new Set(others.filter(([, b]) => before.intersectsBox(b)).map(([o]) => o));
       obj.position[ax] += d;
       const me = core.worldBox(obj);
       if (me.isEmpty()) continue;
-      for (const [, b] of others) {
+      for (const [o, b] of others) {
         if (!me.intersectsBox(b)) continue;
+        if (overlapping.has(o) && ax !== 'y') continue;
+        if (overlapping.has(o) && d > 0) continue;
         const push = d > 0 ? b.min[ax] - me.max[ax] - 1e-4 : b.max[ax] - me.min[ax] + 1e-4;
         obj.position[ax] += push;
         me.min[ax] += push; me.max[ax] += push;
@@ -519,5 +525,13 @@
     deltaTime() { return Math.round(W.scriptDt * 10000) / 10000; }
     print(a, u) { print(Cast.toString(a.TEXT), 'log', u.target.getName()); }
   }
-  Scratch.extensions.register(new ScratchCode3D());
+  // Comme les blocs de mouvement de Scratch, chaque commande demande un redessin :
+  // une boucle « forever » ne fait alors qu'un tour par image au lieu de milliers.
+  const ext = new ScratchCode3D();
+  for (const b of ext.getInfo().blocks) {
+    if (b.blockType !== Scratch.BlockType.COMMAND || typeof ext[b.opcode] !== 'function') continue;
+    const fn = ext[b.opcode].bind(ext);
+    ext[b.opcode] = (args, util) => { runtime.requestRedraw(); return fn(args, util); };
+  }
+  Scratch.extensions.register(ext);
 })(Scratch);

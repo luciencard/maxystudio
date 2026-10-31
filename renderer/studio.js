@@ -1014,6 +1014,11 @@ const settleEngine = sc => engineSettled || (engineSettled = (async () => {
 frame.addEventListener('load', async () => {
   const doc = frame.contentDocument;
   const st = doc.createElement('style'); st.textContent = ENGINE_CSS; doc.head.appendChild(st);
+  // Les flèches et la barre d'espace servent au jeu : elles ne doivent pas faire défiler la page du moteur
+  doc.addEventListener('keydown', e => {
+    if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key) && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !e.target.isContentEditable) e.preventDefault();
+  });
+  doc.addEventListener('scroll', () => { if (doc.scrollingElement && doc.scrollingElement.scrollTop) doc.scrollingElement.scrollTop = 0; }, true);
   try {
     const sc = await waitEngine();
     await settleEngine(sc);
@@ -1066,6 +1071,7 @@ async function play() {
     if (S.type === '3d') await sc.loadExtension(EXT3D);
     frame.contentWindow.__scProject = { type: S.type, scene: JSON.parse(JSON.stringify(S.scene)), base: S.base };
     frame.contentWindow.__scPaused = false;
+    for (const el of frame.contentDocument.querySelectorAll('html, body, .gui, .stage-pane, .stage-wrap')) { el.scrollTop = 0; el.scrollLeft = 0; }
     const vm = sc.vm;
     let errors = 0;
     S.problems = {};
