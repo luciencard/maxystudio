@@ -1,8 +1,8 @@
 {
-  "name": "scratchcode-studio",
-  "productName": "ScratchCode Studio",
-  "version": "1.2.4",
-  "description": "ScratchCode Studio : un moteur de jeu 2D, 3D et d'applications où le code s'écrit en ScratchCode (blocs Scratch en texte).",
+  "name": "maxystudio",
+  "productName": "MaxyStudio",
+  "version": "2.0.0",
+  "description": "MaxyStudio : un moteur de jeu 2D, 3D et d'applications où le code s'écrit en ScratchCode (blocs Scratch en texte).",
   "main": "main.js",
   "author": "ScratchCode",
   "license": "MIT",
@@ -23,8 +23,8 @@
   },
   "build": {
     "appId": "app.web.scratchcode.studio",
-    "productName": "ScratchCode Studio",
-    "artifactName": "ScratchCode-Studio-${os}-${arch}.${ext}",
+    "productName": "MaxyStudio",
+    "artifactName": "MaxyStudio-${os}-${arch}.${ext}",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -37,13 +37,14 @@
       "engine/**",
       "node_modules/monaco-editor/min/**",
       "node_modules/three/build/**",
+      "plugins-catalog/**",
       "vendor/**",
       "package.json"
     ],
     "fileAssociations": [
       {
         "ext": "scratchcode",
-        "name": "Projet ScratchCode Studio",
+        "name": "Projet MaxyStudio",
         "role": "Editor"
       }
     ],
@@ -69,17 +70,17 @@
           ]
         }
       ],
-      "artifactName": "ScratchCode-Studio-win-${arch}.${ext}"
+      "artifactName": "MaxyStudio-win-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "ScratchCode Studio",
-      "artifactName": "ScratchCode-Studio-Setup.${ext}"
+      "shortcutName": "MaxyStudio",
+      "artifactName": "MaxyStudio-Setup.${ext}"
     },
     "msi": {
-      "artifactName": "ScratchCode-Studio.${ext}"
+      "artifactName": "MaxyStudio.${ext}"
     },
     "mac": {
       "icon": "build/icon.png",
@@ -100,7 +101,7 @@
         }
       ],
       "identity": "-",
-      "artifactName": "ScratchCode-Studio-mac-${arch}.${ext}"
+      "artifactName": "MaxyStudio-mac-${arch}.${ext}"
     },
     "linux": {
       "icon": "build/icon.png",
@@ -126,8 +127,8 @@
           ]
         }
       ],
-      "artifactName": "ScratchCode-Studio-linux-${arch}.${ext}"
+      "artifactName": "MaxyStudio-linux-${arch}.${ext}"
     }
   },
-  "repository": "https://github.com/luciencard/scratchcode-studio"
+  "repository": "https://github.com/luciencard/maxystudio"
 }

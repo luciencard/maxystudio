@@ -1,4 +1,4 @@
-// Extension « ScratchCode 3D » : les blocs 3D des projets de ScratchCode Studio.
+// Extension « ScratchCode 3D » : les blocs 3D des projets de MaxyStudio.
 // Chaque objet de la scène qui a un script est un lutin du même nom : « this object » désigne cet objet.
 (function (Scratch) {
   'use strict';

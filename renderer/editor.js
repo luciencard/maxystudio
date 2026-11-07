@@ -1,4 +1,4 @@
-/* ScratchCode Studio - espace de travail (disposition inspirée des IDE JetBrains) */
+/* MaxyStudio - espace de travail (disposition inspirée des IDE JetBrains) */
 hydrateIcons();
 const $ = s => document.querySelector(s);
 const DIR = new URLSearchParams(location.search).get('dir');
@@ -777,7 +777,7 @@ require(['vs/editor/editor.main'], async () => {
     const name = state.config.name;
     $('#tProject').textContent = name; $('#tPath').textContent = DIR;
     $('#projIcon').textContent = name.replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'SC';
-    document.title = `${name} - ScratchCode Studio`;
+    document.title = `${name} - MaxyStudio`;
     journal(`Projet ouvert : ${esc(DIR)}`);
     const first = allFiles().find(f => /^sprites\/.+\.sc$/.test(f)) || (allFiles().includes('stage.sc') ? 'stage.sc' : null);
     if (first) await openFile(first); else renderInspector();

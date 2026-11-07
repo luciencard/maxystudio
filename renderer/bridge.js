@@ -1,4 +1,4 @@
-// Pont universel ScratchCode Studio (fonctionne sous Electron preload ET sous le serveur natif C# / macOS / Linux)
+// Pont universel MaxyStudio (fonctionne sous Electron preload ET sous le serveur natif C# / macOS / Linux)
 (function () {
   if (window.studio) return;
 

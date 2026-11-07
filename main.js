@@ -1,4 +1,4 @@
-// ScratchCode Studio 1.2 - processus principal Electron
+// MaxyStudio 2.0 - processus principal Electron
 // Un projet est un vrai dossier sur le disque :
 //   MonJeu/
 //     project.scratchcode   configuration (type 2d, 3d ou app, scène principale...)
@@ -110,6 +110,12 @@ function resolveAppPath(urlPath) {
   // Les modules « examples » de three.js sont copiés dans vendor/ : electron-builder exclut les dossiers examples de node_modules.
   if (p.startsWith('/three/examples/jsm/')) return path.join(ROOT, 'vendor', 'three-addons', p.slice('/three/examples/jsm/'.length));
   if (p.startsWith('/three/')) return path.join(THREE_DIR, p.slice('/three/'.length));
+  // Plugins installés : /plugins/<id>/plugin.js (chaque plugin reste dans son propre dossier).
+  if (p.startsWith('/plugins/')) {
+    const [, , id, ...rest] = p.split('/');
+    if (!PLUGIN_ID.test(id || '')) return null;
+    return safeJoin(path.join(pluginsDir(), id), rest.join('/'));
+  }
   if (p.startsWith('/project/')) {
     const [, , key, ...rest] = p.split('/');
     const dir = decDir(key);
@@ -138,6 +144,78 @@ function registerProtocol() {
 
 // ---------- Projets récents ----------
 const recentFile = () => path.join(app.getPath('userData'), 'recent-projects.json');
+// ScratchCode Studio s'appelle maintenant MaxyStudio : son dossier de données change, on reprend la liste des projets récents.
+async function migrateFromScratchCodeStudio() {
+  const old = path.join(app.getPath('appData'), 'ScratchCode Studio', 'recent-projects.json');
+  if (fs.existsSync(recentFile()) || !fs.existsSync(old)) return;
+  await fsp.mkdir(path.dirname(recentFile()), { recursive: true });
+  await fsp.copyFile(old, recentFile());
+}
+
+// ---------- Plugins ----------
+// Un plugin est un dossier : plugin.json (id, name, version, author, description, main) et son fichier JavaScript.
+// Installés dans <données de l'appli>/plugins/<id>. Le catalogue intégré est dans plugins-catalog/ (exemples fournis).
+const PLUGIN_ID = /^[a-z0-9][a-z0-9-]{1,40}$/;
+const pluginsDir = () => path.join(app.getPath('userData'), 'plugins');
+const pluginsStateFile = () => path.join(app.getPath('userData'), 'plugins-state.json');
+const CATALOG_DIR = path.join(ROOT, 'plugins-catalog');
+
+function checkManifest(m) {
+  if (!m || typeof m !== 'object') throw new Error('plugin.json est illisible.');
+  if (!PLUGIN_ID.test(m.id || '')) throw new Error('« id » doit contenir seulement des minuscules, chiffres et tirets (2 à 41 caractères).');
+  if (!m.name || String(m.name).length > 60) throw new Error('« name » est obligatoire (60 caractères au plus).');
+  const main = m.main || 'plugin.js';
+  if (!/^[\w.-]+(\/[\w.-]+)*\.m?js$/.test(main) || main.includes('..')) throw new Error('« main » doit désigner un fichier .js du plugin.');
+  return { id: m.id, name: String(m.name), version: String(m.version || '1.0.0'), author: String(m.author || ''), description: String(m.description || '').slice(0, 300), main, icon: m.icon || 'plug' };
+}
+async function readManifest(dir) {
+  return checkManifest(JSON.parse(await fsp.readFile(path.join(dir, 'plugin.json'), 'utf8')));
+}
+async function pluginsState() {
+  try { return JSON.parse(await fsp.readFile(pluginsStateFile(), 'utf8')); } catch { return {}; }
+}
+async function listPlugins() {
+  const state = await pluginsState();
+  const out = [];
+  for (const e of await fsp.readdir(pluginsDir(), { withFileTypes: true }).catch(() => [])) {
+    if (!e.isDirectory()) continue;
+    try { const m = await readManifest(path.join(pluginsDir(), e.name)); out.push({ ...m, enabled: state[m.id] !== false }); } catch (err) { out.push({ id: e.name, name: e.name, broken: String(err.message || err), enabled: false }); }
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+async function copyDir(from, to) {
+  await fsp.mkdir(to, { recursive: true });
+  for (const e of await fsp.readdir(from, { withFileTypes: true })) {
+    if (e.name === 'node_modules' || e.name === '.git') continue;
+    if (e.isDirectory()) await copyDir(path.join(from, e.name), path.join(to, e.name));
+    else await fsp.copyFile(path.join(from, e.name), path.join(to, e.name));
+  }
+}
+async function installPluginDir(src) {
+  const m = await readManifest(src);
+  const dest = path.join(pluginsDir(), m.id);
+  await fsp.rm(dest, { recursive: true, force: true });
+  await copyDir(src, dest);
+  return m;
+}
+async function installPluginArchive(file) {
+  const files = readZipBuffer(await fsp.readFile(file));
+  // L'archive peut contenir le plugin à la racine ou dans un seul dossier.
+  const names = Object.keys(files);
+  const manifestName = names.find(n => n === 'plugin.json') || names.find(n => /^[^/]+\/plugin\.json$/.test(n));
+  if (!manifestName) throw new Error('Aucun plugin.json dans ce fichier.');
+  const prefix = manifestName.slice(0, -'plugin.json'.length);
+  const m = checkManifest(JSON.parse(files[manifestName].toString('utf8')));
+  const dest = path.join(pluginsDir(), m.id);
+  await fsp.rm(dest, { recursive: true, force: true });
+  for (const [name, data] of Object.entries(files)) {
+    if (!name.startsWith(prefix)) continue;
+    const target = safeJoin(dest, name.slice(prefix.length));
+    await fsp.mkdir(path.dirname(target), { recursive: true });
+    await fsp.writeFile(target, data);
+  }
+  return m;
+}
 async function readRecent() {
   try { return JSON.parse(await fsp.readFile(recentFile(), 'utf8')); } catch { return []; }
 }
@@ -315,7 +393,7 @@ async function buildPlayArchive(dir, spec) {
       direction: sp.direction == null ? 90 : +sp.direction, draggable: !!sp.draggable, rotationStyle: sp.rotationStyle || 'all around'
     });
   }
-  files['project.json'] = JSON.stringify({ targets, monitors: [], extensions: [], meta: { semver: '3.0.0', vm: '0.2.0', agent: 'ScratchCode Studio 1.2' } });
+  files['project.json'] = JSON.stringify({ targets, monitors: [], extensions: [], meta: { semver: '3.0.0', vm: '0.2.0', agent: 'MaxyStudio 2.0' } });
   return createZipBuffer(files).toString('base64');
 }
 
@@ -326,7 +404,7 @@ const watchers = new Map();
 function createHub() {
   if (hubWin && !hubWin.isDestroyed()) { hubWin.focus(); return; }
   hubWin = new BrowserWindow({
-    width: 980, height: 660, minWidth: 800, minHeight: 540, title: 'ScratchCode Studio',
+    width: 980, height: 660, minWidth: 800, minHeight: 540, title: 'MaxyStudio',
     backgroundColor: '#1e1f22', icon: path.join(ROOT, 'build', 'icon.png'),
     webPreferences: { preload: path.join(ROOT, 'preload.js'), contextIsolation: true }
   });
@@ -338,7 +416,7 @@ async function openProjectWindow(dir) {
   const project = await readProject(dir);
   await addRecent(dir, project.config.name, project.config.type);
   const win = new BrowserWindow({
-    width: 1500, height: 920, minWidth: 1080, minHeight: 680, title: `${project.config.name} - ScratchCode Studio`,
+    width: 1500, height: 920, minWidth: 1080, minHeight: 680, title: `${project.config.name} - MaxyStudio`,
     backgroundColor: '#1e1f22', icon: path.join(ROOT, 'build', 'icon.png'),
     webPreferences: { preload: path.join(ROOT, 'preload.js'), contextIsolation: true }
   });
@@ -488,7 +566,44 @@ ipcMain.handle('file:rename', async (_e, dir, from, to) => {
 ipcMain.handle('shell:reveal', (_e, dir, rel) => rel ? shell.showItemInFolder(safeJoin(dir, rel)) : shell.openPath(dir));
 ipcMain.handle('hub:show', () => createHub());
 
+ipcMain.handle('plugins:list', () => listPlugins());
+ipcMain.handle('plugins:catalog', async () => {
+  const installed = new Map((await listPlugins()).map(p => [p.id, p.version]));
+  const out = [];
+  for (const e of await fsp.readdir(CATALOG_DIR, { withFileTypes: true }).catch(() => [])) {
+    if (!e.isDirectory()) continue;
+    try { const m = await readManifest(path.join(CATALOG_DIR, e.name)); out.push({ ...m, installed: installed.get(m.id) || null }); } catch { /* exemple invalide : ignoré */ }
+  }
+  return out;
+});
+ipcMain.handle('plugins:installCatalog', async (_e, id) => {
+  if (!PLUGIN_ID.test(id || '')) throw new Error('Plugin inconnu.');
+  return installPluginDir(path.join(CATALOG_DIR, id));
+});
+ipcMain.handle('plugins:installFrom', async (e, kind) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (kind === 'folder') {
+    const r = await dialog.showOpenDialog(win, { title: 'Dossier du plugin (avec plugin.json)', properties: ['openDirectory'] });
+    return r.canceled ? null : installPluginDir(r.filePaths[0]);
+  }
+  const r = await dialog.showOpenDialog(win, { title: 'Ajouter un plugin', properties: ['openFile'], filters: [{ name: 'Plugin MaxyStudio', extensions: ['maxyplugin', 'zip'] }] });
+  return r.canceled ? null : installPluginArchive(r.filePaths[0]);
+});
+ipcMain.handle('plugins:remove', async (_e, id) => {
+  if (!PLUGIN_ID.test(id || '')) throw new Error('Plugin inconnu.');
+  await fsp.rm(path.join(pluginsDir(), id), { recursive: true, force: true });
+});
+ipcMain.handle('plugins:setEnabled', async (_e, id, on) => {
+  const state = await pluginsState();
+  state[id] = !!on;
+  await fsp.mkdir(path.dirname(pluginsStateFile()), { recursive: true });
+  await fsp.writeFile(pluginsStateFile(), JSON.stringify(state, null, 2));
+});
+ipcMain.handle('plugins:openFolder', async () => { await fsp.mkdir(pluginsDir(), { recursive: true }); return shell.openPath(pluginsDir()); });
+ipcMain.handle('shell:openExternal', (_e, url) => /^https:\/\//.test(url) ? shell.openExternal(url) : null);
+
 app.whenReady().then(async () => {
+  await migrateFromScratchCodeStudio().catch(() => {});
   registerProtocol();
   Menu.setApplicationMenu(null);
   const arg = process.argv.slice(1).find(a => /\.scratchcode$/i.test(a));

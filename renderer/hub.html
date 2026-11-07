@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>ScratchCode Studio</title>
+  <title>MaxyStudio</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="ide.css">
   <link rel="stylesheet" href="hub.css">
@@ -32,7 +32,7 @@
     <aside class="wl-side">
       <div class="wl-brand">
         <img src="logo.svg" width="40" height="40" alt="">
-        <div><b>ScratchCode Studio</b><span id="ver">1.2.4</span></div>
+        <div><b>MaxyStudio</b><span id="ver">2.0.0</span></div>
       </div>
       <button class="wl-nav active" data-panel="projects">Projets</button>
       <button class="wl-nav" data-panel="learn">Apprendre</button>
@@ -50,7 +50,7 @@
       </section>
 
       <section class="wl-panel" id="panel-learn">
-        <h1>Apprendre ScratchCode Studio</h1>
+        <h1>Apprendre MaxyStudio</h1>
         <div class="wl-learn">
           <div class="wl-card"><b>Trois types de projets</b><p><b>2D</b> : la scène Scratch, des lutins et leurs costumes. <b>3D</b> : une scène en trois dimensions avec des objets, des lumières, une caméra, la physique et des modèles importés. <b>Application</b> : des boutons, des textes et des champs de saisie.</p></div>
           <div class="wl-card"><b>Comme dans un moteur de jeu</b><p>À gauche la <b>Hiérarchie</b> (les objets de la scène), au centre les vues <b>Scène</b> et <b>Jeu</b>, à droite l'<b>Inspecteur</b> (position, couleur, physique, script), en bas le panneau <b>Projet</b> (tes fichiers) et la <b>Console</b>. Le bouton Lecture en haut lance le jeu.</p></div>
@@ -140,7 +140,7 @@
       const list = projects.filter(p => !q || p.name.toLowerCase().includes(q) || p.path.toLowerCase().includes(q));
       const box = $('#recent');
       if (!projects.length) {
-        box.innerHTML = `<div class="wl-empty"><b>Bienvenue dans ScratchCode Studio</b><p>Crée un projet 2D, 3D ou une application pour commencer,<br>ou ouvre un projet existant.</p></div>`;
+        box.innerHTML = `<div class="wl-empty"><b>Bienvenue dans MaxyStudio</b><p>Crée un projet 2D, 3D ou une application pour commencer,<br>ou ouvre un projet existant.</p></div>`;
         return;
       }
       box.innerHTML = list.length ? list.map(p => {

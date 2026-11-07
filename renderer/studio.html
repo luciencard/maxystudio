@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <title>ScratchCode Studio</title>
+  <title>MaxyStudio</title>
   <link rel="icon" href="logo.svg">
   <link rel="stylesheet" href="studio.css">
   <script type="importmap">{ "imports": { "three": "/three/build/three.module.min.js", "three/addons/": "/three/examples/jsm/" } }</script>
@@ -13,13 +13,14 @@
     <!-- Barre du haut : menus, lecture, projet -->
     <header class="un-top">
       <div class="un-menus">
-        <span class="un-logo" title="ScratchCode Studio"><img src="logo.svg" width="18" height="18" alt=""></span>
+        <span class="un-logo" title="MaxyStudio"><img src="logo.svg" width="18" height="18" alt=""></span>
         <button class="un-menu" data-menu="file">Fichier</button>
         <button class="un-menu" data-menu="edit">Édition</button>
         <button class="un-menu" data-menu="assets">Assets</button>
         <button class="un-menu" data-menu="object">Objet</button>
         <button class="un-menu" data-menu="component">Composant</button>
         <button class="un-menu" data-menu="window">Fenêtre</button>
+        <button class="un-menu" data-menu="plugins">Plugins</button>
         <button class="un-menu" data-menu="help">Aide</button>
       </div>
       <div class="un-play">
@@ -28,6 +29,7 @@
         <button class="un-pbtn" id="stepBtn" title="Image suivante (Ctrl+Alt+P)"><span data-ic="stepFwd" data-size="15"></span></button>
       </div>
       <div class="un-right">
+        <div class="un-plugbar" id="pluginBar" hidden title="Barre des plugins"></div>
         <span class="un-type" id="projType">2D</span>
         <button class="un-proj" id="projBtn" title="Projets récents"><span data-ic="folder" data-size="14"></span><b id="projName">Projet</b><span data-ic="chevronDown" data-size="12"></span></button>
         <button class="un-btn" id="exportBtn" title="Exporter tout le projet en un fichier .scratchcode"><span data-ic="share" data-size="14"></span>Exporter</button>
@@ -128,7 +130,7 @@
       <span class="grow"></span>
       <span id="statusSave"></span>
       <span id="statusCursor"></span>
-      <span>ScratchCode Studio <span id="appVer">1.2</span></span>
+      <span>MaxyStudio <span id="appVer">2.0</span></span>
     </footer>
   </div>
 

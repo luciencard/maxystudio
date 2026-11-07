@@ -1,0 +1,9 @@
+{
+  "id": "build-doctor",
+  "name": "Vérificateur de build",
+  "version": "1.0.0",
+  "author": "ScratchCode Team",
+  "description": "Cherche ce qui casse un build (fichiers manquants, noms en double, scripts vides) et le corrige en un clic. Vérifie aussi le projet avant chaque export.",
+  "main": "plugin.js",
+  "icon": "wrench"
+}

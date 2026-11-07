@@ -24,5 +24,15 @@ contextBridge.exposeInMainWorld('studio', {
   renameFile: (dir, from, to) => ipcRenderer.invoke('file:rename', dir, from, to),
   reveal: (dir, rel) => ipcRenderer.invoke('shell:reveal', dir, rel),
   showHub: () => ipcRenderer.invoke('hub:show'),
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  plugins: {
+    list: () => ipcRenderer.invoke('plugins:list'),
+    catalog: () => ipcRenderer.invoke('plugins:catalog'),
+    installCatalog: (id) => ipcRenderer.invoke('plugins:installCatalog', id),
+    installFrom: (kind) => ipcRenderer.invoke('plugins:installFrom', kind),
+    remove: (id) => ipcRenderer.invoke('plugins:remove', id),
+    setEnabled: (id, on) => ipcRenderer.invoke('plugins:setEnabled', id, on),
+    openFolder: () => ipcRenderer.invoke('plugins:openFolder')
+  },
   onChanged: (cb) => ipcRenderer.on('project:changed', (_e, files) => cb(files))
 });

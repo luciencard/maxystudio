@@ -1,4 +1,4 @@
-/* Écran d'accueil de ScratchCode Studio, dans l'esprit de l'écran « Welcome » des IDE JetBrains */
+/* Écran d'accueil de MaxyStudio, dans l'esprit de l'écran « Welcome » des IDE JetBrains */
 .wl { display: flex; height: 100vh; }
 .wl-side { flex: none; width: 230px; display: flex; flex-direction: column; gap: 2px; padding: 16px 10px; background: var(--panel); border-right: 1px solid var(--line); }
 .wl-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 20px; }

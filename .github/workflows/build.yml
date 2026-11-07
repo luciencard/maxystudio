@@ -1,4 +1,4 @@
-# Compile les installateurs de ScratchCode Studio sur les machines de GitHub
+# Compile les installateurs de MaxyStudio sur les machines de GitHub
 # (Windows, macOS, Linux) et les joint à la Release du tag poussé (ex. v1.1.0).
 name: Installateurs
 on:

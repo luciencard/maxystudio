@@ -1,4 +1,4 @@
-// Modèles de projets de ScratchCode Studio 1.2 (2D, 3D et Application) et guide de syntaxe.
+// Modèles de projets de MaxyStudio 2.0 (2D, 3D et Application) et guide de syntaxe.
 const crypto = require('crypto');
 const id = () => crypto.randomBytes(4).toString('hex');
 const json = o => JSON.stringify(o, null, 2);
@@ -174,9 +174,9 @@ const BLOCKS_UI = `
 `;
 
 function guide(type) {
-  return `# Projet ScratchCode Studio 1.2 (${type === '3d' ? '3D' : type === 'app' ? 'Application' : '2D'})
+  return `# Projet MaxyStudio 2.0 (${type === '3d' ? '3D' : type === 'app' ? 'Application' : '2D'})
 
-Ce dossier est un projet **ScratchCode Studio** : des blocs Scratch écrits en texte, dans un moteur de jeu.
+Ce dossier est un projet **MaxyStudio** : des blocs Scratch écrits en texte, dans un moteur de jeu.
 
 ## Structure
 - \`project.scratchcode\` : configuration du projet (JSON)
@@ -184,7 +184,7 @@ Ce dossier est un projet **ScratchCode Studio** : des blocs Scratch écrits en t
 - \`scripts/<Nom>.sc\` : le code d'un objet. Plusieurs objets peuvent partager le même script.
 - \`assets/\` : modèles 3D (.glb, .gltf, .obj, .fbx, .stl, .ply, .dae), images et sons importés
 
-ScratchCode Studio surveille ce dossier : une modification faite par un autre outil (éditeur, assistant IA) est rechargée automatiquement.
+MaxyStudio surveille ce dossier : une modification faite par un autre outil (éditeur, assistant IA) est rechargée automatiquement.
 Pour partager le projet, utilise Fichier > Exporter : tout le dossier devient un seul fichier \`.scratchcode\`.
 
 ## Syntaxe

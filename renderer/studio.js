@@ -1,7 +1,8 @@
-/* ScratchCode Studio 1.2 - éditeur de scènes (Hiérarchie, Scène, Jeu, Inspecteur, Projet, Console) */
+/* MaxyStudio 2.0 - éditeur de scènes (Hiérarchie, Scène, Jeu, Inspecteur, Projet, Console) */
 import * as core from './sc3d-core.js';
 import { SceneView3D } from './scene-view3d.js';
 import { SceneView2D } from './scene-view2d.js';
+import { initPlugins } from './plugins.js';
 
 hydrateIcons();
 const $ = s => document.querySelector(s);
@@ -24,6 +25,7 @@ const S = {
   logs: [], levels: { log: true, warn: true, error: true }, collapse: false, clearOnPlay: true, problems: {}
 };
 let view = null, monaco = null, editor = null;
+let plugins = null;
 const ignoreDisk = new Map();
 const markOwnWrite = rel => ignoreDisk.set(rel, Date.now());
 
@@ -169,6 +171,7 @@ function select(id, { fromView } = {}) {
   S.selAsset = null;
   view.select(id && id[0] !== '_' ? id : null);
   renderHier(); renderInsp(); renderAssets();
+  if (plugins) plugins.emit('select', id);
 }
 function selectAsset(rel) {
   S.selAsset = rel;
@@ -908,6 +911,7 @@ async function saveAll() {
   for (const rel of S.tabs.filter(t => S.models.has(t) && isDirty(t))) await saveScript(rel);
   await saveSceneNow();
   savedNote('Tout est enregistré');
+  if (plugins) plugins.emit('save');
 }
 function closeTab(rel, force) {
   if (!force && isDirty(rel)) saveScript(rel);
@@ -1096,6 +1100,7 @@ async function play() {
     activateTab('game');
     vm.greenFlag();
     frame.focus();
+    if (plugins) plugins.emit('play');
   } catch (e) {
     log('error', 'Lancement impossible : ' + cleanErr(e));
     toast(cleanErr(e), true);
@@ -1112,6 +1117,7 @@ function stop() {
   setMode('edit');
   activateTab('scene');
   log('log', 'Jeu arrêté.');
+  if (plugins) plugins.emit('stop');
 }
 function pause() {
   if (S.mode === 'edit') return;
@@ -1228,12 +1234,13 @@ const MENUS = {
     '-',
     { label: 'Disposition par défaut', ic: 'grid', fn: () => { const m = $('#main'); m.style.removeProperty('--hier-w'); m.style.removeProperty('--insp-w'); m.style.removeProperty('--bottom-h'); localStorage.removeItem('studio.layout'); } }
   ],
+  plugins: () => plugins ? plugins.menu() : [],
   help: () => [
     { label: 'Guide de syntaxe (SCRATCHCODE.md)', ic: 'book', fn: () => openScript('SCRATCHCODE.md') },
     { label: 'Raccourcis clavier', ic: 'list', fn: shortcutsHelp },
     { label: 'Site ScratchCode', ic: 'external', fn: () => window.open('https://scratchcode.web.app') },
     '-',
-    { label: 'À propos de ScratchCode Studio', ic: 'info', fn: async () => modal('ScratchCode Studio', `<p class="in-note" style="font-size:13px">Version ${esc(await studio.version())}<br>Moteur 2D : Scratch 3. Moteur 3D : three.js.<br>Projets au format .scratchcode.</p>`, { cancel: '' }) }
+    { label: 'À propos de MaxyStudio', ic: 'info', fn: async () => modal('MaxyStudio', `<p class="in-note" style="font-size:13px">Version ${esc(await studio.version())}<br>Moteur 2D : Scratch 3. Moteur 3D : three.js.<br>Projets au format .scratchcode.</p>`, { cancel: '' }) }
   ]
 };
 document.querySelectorAll('.un-menu').forEach(b => {
@@ -1249,6 +1256,7 @@ function shortcutsHelp() {
 async function exportProject() {
   try {
     await saveAll();
+    if (plugins && !(await plugins.beforeExport())) return;
     const p = await studio.exportProject(DIR, S.config.name);
     if (p) { toast('Projet exporté : ' + p); log('ok', 'Projet exporté : ' + p); }
   } catch (e) { toast(cleanErr(e), true); }
@@ -1408,7 +1416,7 @@ function setupMonaco() {
     S.config = p.config; S.tree = p.tree; S.base = p.assetBase;
     S.type = p.config.type === '3d' ? '3d' : p.config.type === 'app' ? 'app' : '2d';
     S.scenePath = p.config.mainScene || 'scenes/Main.scene';
-    document.title = `${S.config.name} - ScratchCode Studio`;
+    document.title = `${S.config.name} - MaxyStudio`;
     $('#projName').textContent = S.config.name;
     $('#projType').textContent = S.type === '3d' ? '3D' : S.type === 'app' ? 'APP' : '2D';
     $('#projType').className = 'un-type' + (S.type === '3d' ? ' t3d' : S.type === 'app' ? ' tapp' : '');
@@ -1442,6 +1450,19 @@ function setupMonaco() {
     log('log', `Projet ouvert : ${DIR}`);
     setupMonaco();
     setMode('edit');
+    plugins = initPlugins({
+      $, esc, icon, S, DIR, log, toast, modal, ask, confirmBox, cleanErr,
+      allFiles, writeText, refreshTree, openScript, findObj, descendants, select, createObject, snapshot,
+      play, stop,
+      async reloadScene() {
+        normalizeScene();
+        if (S.sel && S.sel[0] !== '_' && !findObj(S.sel)) S.sel = null;
+        await view.load(S.scene);
+        view.select(S.sel && S.sel[0] !== '_' ? S.sel : null);
+        renderHier(); renderInsp(); saveScene();
+      }
+    });
+    await plugins.loadAll();
   } catch (e) {
     console.error(e);
     toast(cleanErr(e), true);
