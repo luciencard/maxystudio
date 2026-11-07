@@ -179,13 +179,13 @@ function guide(type) {
 Ce dossier est un projet **MaxyStudio** : des blocs Scratch écrits en texte, dans un moteur de jeu.
 
 ## Structure
-- \`project.scratchcode\` : configuration du projet (JSON)
+- \`project.maxycode\` : configuration du projet (JSON)
 - \`scenes/Main.scene\` : les objets de la scène (position, couleur, script...)
 - \`scripts/<Nom>.sc\` : le code d'un objet. Plusieurs objets peuvent partager le même script.
 - \`assets/\` : modèles 3D (.glb, .gltf, .obj, .fbx, .stl, .ply, .dae), images et sons importés
 
 MaxyStudio surveille ce dossier : une modification faite par un autre outil (éditeur, assistant IA) est rechargée automatiquement.
-Pour partager le projet, utilise Fichier > Exporter : tout le dossier devient un seul fichier \`.scratchcode\`.
+Pour partager le projet, utilise Fichier > Exporter : tout le dossier devient un seul fichier \`.maxycode\`.
 
 ## Syntaxe
 - Un bloc par ligne. Un script commence par un bloc chapeau, par exemple \`when app run\` (le drapeau vert de Scratch). Scripts séparés par une ligne vide.

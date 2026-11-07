@@ -1,12 +1,12 @@
 // MaxyStudio 2.0 - processus principal Electron
 // Un projet est un vrai dossier sur le disque :
 //   MonJeu/
-//     project.scratchcode   configuration (type 2d, 3d ou app, scène principale...)
+//     project.maxycode      configuration (type 2d, 3d ou app, scène principale...) ; project.scratchcode avant la 2.1
 //     scenes/Main.scene     objets de la scène (JSON)
 //     scripts/*.sc          un script par objet, en ScratchCode
 //     assets/               modèles 3D, images, sons importés
 //     SCRATCHCODE.md        guide de syntaxe (utile aux assistants IA)
-// Un projet entier peut aussi être échangé en un seul fichier .scratchcode (archive zip).
+// Un projet entier peut aussi être échangé en un seul fichier .maxycode (archive zip ; .scratchcode avant la 2.1).
 
 const { app, BrowserWindow, ipcMain, dialog, protocol, shell, Menu } = require('electron');
 const path = require('path');
@@ -60,7 +60,7 @@ function createZipBuffer(entries) {
 function readZipBuffer(buf) {
   let eocd = -1;
   for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
-  if (eocd < 0) throw new Error("Ce fichier n'est pas une archive .scratchcode valide.");
+  if (eocd < 0) throw new Error("Ce fichier n'est pas une archive .maxycode valide.");
   const count = buf.readUInt16LE(eocd + 10);
   let p = buf.readUInt32LE(eocd + 16);
   const out = {};
@@ -245,8 +245,8 @@ async function createProject({ parentDir, name, type, template }) {
     format: 'scratchcode', version: 2, engine: '1.2', name: safe, type: tpl.type, template: template || 'vide',
     mainScene: 'scenes/Main.scene', settings: { title: safe }, created: new Date().toISOString()
   };
-  await fsp.writeFile(path.join(dir, 'project.scratchcode'), JSON.stringify(config, null, 2));
-  await fsp.writeFile(path.join(dir, 'SCRATCHCODE.md'), T.guide(tpl.type));
+  await fsp.writeFile(path.join(dir, CFG), JSON.stringify(config, null, 2));
+  await fsp.writeFile(path.join(dir, 'MAXYCODE.md'), T.guide(tpl.type));
   return dir;
 }
 
@@ -283,13 +283,23 @@ async function migrate(dir, config) {
   }
   await fsp.writeFile(path.join(dir, 'scenes', 'Main.scene'), JSON.stringify(scene, null, 2));
   const next = { format: 'scratchcode', version: 2, engine: '1.2', name: config.name || path.basename(dir), type: '2d', mainScene: 'scenes/Main.scene', settings: { title: config.title || config.name }, created: config.created || new Date().toISOString(), migratedFrom: config.version || 1 };
-  await fsp.writeFile(path.join(dir, 'project.scratchcode'), JSON.stringify(next, null, 2));
+  await fsp.writeFile(path.join(dir, CFG), JSON.stringify(next, null, 2));
   return next;
 }
 
+// Format des projets : project.maxycode depuis MaxyStudio 2.1 (project.scratchcode avant).
+const CFG = 'project.maxycode', OLD_CFG = 'project.scratchcode';
+const isProjectDir = dir => fs.existsSync(path.join(dir, CFG)) || fs.existsSync(path.join(dir, OLD_CFG));
+/** Chemin du fichier de configuration ; un ancien project.scratchcode est renommé en project.maxycode. */
+async function configFile(dir) {
+  const cfg = path.join(dir, CFG), old = path.join(dir, OLD_CFG);
+  if (!fs.existsSync(cfg) && fs.existsSync(old)) await fsp.rename(old, cfg).catch(() => {});
+  return fs.existsSync(cfg) ? cfg : old;
+}
+
 async function readProject(dir) {
-  const cfgPath = path.join(dir, 'project.scratchcode');
-  if (!fs.existsSync(cfgPath)) throw new Error('Ce dossier ne contient pas de fichier project.scratchcode.');
+  const cfgPath = await configFile(dir);
+  if (!fs.existsSync(cfgPath)) throw new Error('Ce dossier ne contient pas de projet MaxyStudio (project.maxycode).');
   let config = JSON.parse(await fsp.readFile(cfgPath, 'utf8'));
   config = await migrate(dir, config);
   openDirs.add(dir);
@@ -441,9 +451,9 @@ async function openProjectWindow(dir) {
 
 async function importArchive(file, parentDir) {
   const entries = readZipBuffer(await fsp.readFile(file));
-  const cfgName = Object.keys(entries).find(k => k === 'project.scratchcode' || k.endsWith('/project.scratchcode'));
-  if (!cfgName) throw new Error("Cette archive ne contient pas de projet ScratchCode (project.scratchcode manquant).");
-  const prefix = cfgName.slice(0, -'project.scratchcode'.length);
+  const cfgName = Object.keys(entries).find(k => [CFG, OLD_CFG].some(c => k === c || k.endsWith('/' + c)));
+  if (!cfgName) throw new Error("Cette archive ne contient pas de projet MaxyStudio (project.maxycode manquant).");
+  const prefix = cfgName.slice(0, cfgName.lastIndexOf('project.'));
   let cfg = {};
   try { cfg = JSON.parse(entries[cfgName].toString('utf8')); } catch { /* nom par défaut */ }
   const base = safeName(cfg.name || path.basename(file, path.extname(file)));
@@ -462,8 +472,8 @@ async function openPathArg(p) {
   if (!p || !fs.existsSync(p)) return false;
   const st = await fsp.stat(p);
   if (st.isDirectory()) { await openProjectWindow(p); return true; }
-  if (path.basename(p) === 'project.scratchcode') { await openProjectWindow(path.dirname(p)); return true; }
-  if (p.toLowerCase().endsWith('.scratchcode')) {
+  if ([CFG, OLD_CFG].includes(path.basename(p))) { await openProjectWindow(path.dirname(p)); return true; }
+  if (/\.(maxycode|scratchcode)$/i.test(p)) {
     const dir = await importArchive(p, path.join(app.getPath('documents'), 'ScratchCode Projects'));
     await openProjectWindow(dir);
     return true;
@@ -473,7 +483,7 @@ async function openPathArg(p) {
 
 // ---------- IPC ----------
 const defaultLocation = () => path.join(app.getPath('documents'), 'ScratchCode Projects');
-ipcMain.handle('recent:list', async () => (await readRecent()).filter(p => fs.existsSync(path.join(p.path, 'project.scratchcode'))));
+ipcMain.handle('recent:list', async () => (await readRecent()).filter(p => isProjectDir(p.path)));
 ipcMain.handle('recent:remove', async (_e, dir) => {
   const list = (await readRecent()).filter(p => p.path !== dir);
   await fsp.writeFile(recentFile(), JSON.stringify(list, null, 2));
@@ -494,8 +504,8 @@ ipcMain.handle('project:create', async (_e, opts) => {
 ipcMain.handle('project:open', async (_e, dir) => { await openProjectWindow(dir); return true; });
 ipcMain.handle('project:openAny', async (e) => {
   const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
-    title: 'Ouvrir un projet ScratchCode', properties: ['openFile'],
-    filters: [{ name: 'Projet ScratchCode (.scratchcode)', extensions: ['scratchcode'] }]
+    title: 'Ouvrir un projet MaxyStudio', properties: ['openFile'],
+    filters: [{ name: 'Projet MaxyStudio (.maxycode)', extensions: ['maxycode', 'scratchcode'] }]
   });
   if (r.canceled || !r.filePaths[0]) return false;
   return openPathArg(r.filePaths[0]);
@@ -503,8 +513,8 @@ ipcMain.handle('project:openAny', async (e) => {
 ipcMain.handle('project:read', (_e, dir) => readProject(dir));
 ipcMain.handle('project:export', async (e, dir, name) => {
   const r = await dialog.showSaveDialog(BrowserWindow.fromWebContents(e.sender), {
-    title: 'Exporter le projet', defaultPath: path.join(app.getPath('documents'), `${safeName(name)}.scratchcode`),
-    filters: [{ name: 'Projet ScratchCode (.scratchcode)', extensions: ['scratchcode'] }]
+    title: 'Exporter le projet', defaultPath: path.join(app.getPath('documents'), `${safeName(name)}.maxycode`),
+    filters: [{ name: 'Projet MaxyStudio (.maxycode)', extensions: ['maxycode'] }]
   });
   if (r.canceled || !r.filePath) return null;
   const entries = {};
@@ -606,7 +616,7 @@ app.whenReady().then(async () => {
   await migrateFromScratchCodeStudio().catch(() => {});
   registerProtocol();
   Menu.setApplicationMenu(null);
-  const arg = process.argv.slice(1).find(a => /\.scratchcode$/i.test(a));
+  const arg = process.argv.slice(1).find(a => /\.(maxycode|scratchcode)$/i.test(a));
   if (!(arg && await openPathArg(arg).catch(() => false))) createHub();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createHub(); });
 });

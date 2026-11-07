@@ -57,7 +57,7 @@
           <div class="wl-card"><b>Le code</b><p>Chaque objet peut avoir un script <code>.sc</code> écrit en ScratchCode. Le premier bloc d'un script est souvent <code>when app run</code>, qui remplace le drapeau vert. En 3D, de nouveaux blocs déplacent les objets : <code>move forward (0.1)</code>, <code>jump with force (6)</code>, <code>camera follow [myself] distance (7) height (3)</code>...</p></div>
           <div class="wl-card"><b>Importer des assets</b><p>Glisse tes fichiers dans le panneau Projet, ou clique sur Importer : modèles 3D <code>.glb</code> <code>.gltf</code> <code>.obj</code> <code>.fbx</code> <code>.stl</code> <code>.ply</code> <code>.dae</code>, images et sons. Glisse ensuite un modèle dans la vue Scène pour l'ajouter.</p></div>
           <div class="wl-card"><b>Raccourcis essentiels</b><p><kbd>Ctrl</kbd>+<kbd>P</kbd> lancer ou arrêter · <kbd>Ctrl</kbd>+<kbd>S</kbd> enregistrer · <kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler · <kbd>Ctrl</kbd>+<kbd>D</kbd> dupliquer · <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> déplacer, pivoter, redimensionner · <kbd>F</kbd> cadrer la sélection</p></div>
-          <div class="wl-card"><b>Partager un projet</b><p>Fichier &gt; Exporter crée un seul fichier <code>.scratchcode</code> avec tout le projet. Pour l'ouvrir sur un autre ordinateur : bouton Ouvrir, ou double-clic sur le fichier.</p></div>
+          <div class="wl-card"><b>Partager un projet</b><p>Fichier &gt; Exporter crée un seul fichier <code>.maxycode</code> avec tout le projet. Pour l'ouvrir sur un autre ordinateur : bouton Ouvrir, ou double-clic sur le fichier.</p></div>
         </div>
       </section>
     </main>
@@ -81,7 +81,7 @@
               <div class="loc-row"><input class="field" id="pLoc" spellcheck="false"><button class="wl-btn" id="pickLoc" title="Parcourir"><span data-ic="folder" data-size="15"></span></button></div></div>
           </div>
           <div class="path-preview" id="pathPreview"></div>
-          <div class="wl-note">Le projet est un dossier : scènes, scripts <b>.sc</b> et assets. Il s'exporte en un seul fichier <b>.scratchcode</b>.</div>
+          <div class="wl-note">Le projet est un dossier : scènes, scripts <b>.sc</b> et assets. Il s'exporte en un seul fichier <b>.maxycode</b>.</div>
         </div>
       </div>
       <div class="wl-dialog-foot">
@@ -164,7 +164,7 @@
         const m = document.createElement('div');
         m.className = 'menu show';
         m.style.cssText = `position:fixed;left:${r.left}px;top:${r.bottom + 4}px;z-index:60`;
-        m.innerHTML = `<button data-c="folder">${icon('folderOpen', 14)}<span>Ouvrir un dossier de projet…</span></button><button data-c="file">${icon('box', 14)}<span>Ouvrir un fichier .scratchcode…</span></button>`;
+        m.innerHTML = `<button data-c="folder">${icon('folderOpen', 14)}<span>Ouvrir un dossier de projet…</span></button><button data-c="file">${icon('box', 14)}<span>Ouvrir un fichier .maxycode…</span></button>`;
         document.body.appendChild(m);
         const close = c => { m.remove(); removeEventListener('mousedown', out, true); res(c); };
         const out = e => { if (!m.contains(e.target)) close(null); };

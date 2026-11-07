@@ -94,7 +94,7 @@ function kindOf(rel) {
   if (e === 'sc') return 'sc';
   if (e === 'scene') return 'scene';
   if (e === 'md') return 'md';
-  if (e === 'json' || e === 'scratchcode') return 'json';
+  if (e === 'json' || e === 'maxycode' || e === 'scratchcode') return 'json';
   return 'file';
 }
 const KIND_ICON = { model: 'box', image: 'image', sound: 'volume', sc: 'fileCode', scene: 'scene', md: 'book', json: 'braces', file: 'file', dir: 'folder' };
@@ -505,7 +505,7 @@ function renderStage(box) {
 }
 function projectComp() {
   return comp('project', 'folder', 'Projet', `${lbl('Nom')}<span>${esc(S.config.name)}</span>${lbl('Type')}<span>${S.type === '3d' ? '3D' : S.type === 'app' ? 'Application' : '2D'}</span>
-    ${lbl('Dossier')}<span class="in-note" title="${esc(DIR)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(DIR)}</span>${lbl('Format')}<span>.scratchcode</span>`);
+    ${lbl('Dossier')}<span class="in-note" title="${esc(DIR)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(DIR)}</span>${lbl('Format')}<span>.maxycode</span>`);
 }
 function renderEnv(box) {
   const e = S.scene.environment;
@@ -889,7 +889,7 @@ async function openScript(rel, line) {
   if (!S.models.has(rel)) {
     let text;
     try { text = await studio.readFile(DIR, rel); } catch { return toast(`Fichier introuvable : ${rel}`, true); }
-    const lang = rel.endsWith('.sc') ? 'scratchcode' : rel.endsWith('.md') ? 'markdown' : (rel.endsWith('.json') || rel.endsWith('.scratchcode') || rel.endsWith('.scene')) ? 'json' : 'plaintext';
+    const lang = rel.endsWith('.sc') ? 'scratchcode' : rel.endsWith('.md') ? 'markdown' : (rel.endsWith('.json') || rel.endsWith('.maxycode') || rel.endsWith('.scratchcode') || rel.endsWith('.scene')) ? 'json' : 'plaintext';
     const model = monaco.editor.createModel(text, lang, monaco.Uri.parse('file:///' + encodeURI(rel)));
     model.onDidChangeContent(() => renderTabs());
     S.models.set(rel, model); S.saved.set(rel, text);
@@ -1190,7 +1190,7 @@ const MENUS = {
     { label: 'Ouvrir un projet…', ic: 'folderOpen', fn: () => studio.showHub() },
     '-',
     { label: 'Tout enregistrer', ic: 'save', key: 'Ctrl+S', fn: saveAll },
-    { label: 'Exporter le projet (.scratchcode)…', ic: 'share', fn: exportProject },
+    { label: 'Exporter le projet (.maxycode)…', ic: 'share', fn: exportProject },
     '-',
     { label: 'Ouvrir le dossier du projet', ic: 'external', fn: () => studio.reveal(DIR) },
     { label: 'Écran d\'accueil', ic: 'home', fn: () => studio.showHub() }
@@ -1236,11 +1236,11 @@ const MENUS = {
   ],
   plugins: () => plugins ? plugins.menu() : [],
   help: () => [
-    { label: 'Guide de syntaxe (SCRATCHCODE.md)', ic: 'book', fn: () => openScript('SCRATCHCODE.md') },
+    { label: 'Guide de syntaxe (MAXYCODE.md)', ic: 'book', fn: () => openScript(allFiles().includes('MAXYCODE.md') ? 'MAXYCODE.md' : 'SCRATCHCODE.md') },
     { label: 'Raccourcis clavier', ic: 'list', fn: shortcutsHelp },
     { label: 'Site ScratchCode', ic: 'external', fn: () => window.open('https://scratchcode.web.app') },
     '-',
-    { label: 'À propos de MaxyStudio', ic: 'info', fn: async () => modal('MaxyStudio', `<p class="in-note" style="font-size:13px">Version ${esc(await studio.version())}<br>Moteur 2D : Scratch 3. Moteur 3D : three.js.<br>Projets au format .scratchcode.</p>`, { cancel: '' }) }
+    { label: 'À propos de MaxyStudio', ic: 'info', fn: async () => modal('MaxyStudio', `<p class="in-note" style="font-size:13px">Version ${esc(await studio.version())}<br>Moteur 2D : Scratch 3. Moteur 3D : three.js.<br>Projets au format .maxycode.</p>`, { cancel: '' }) }
   ]
 };
 document.querySelectorAll('.un-menu').forEach(b => {

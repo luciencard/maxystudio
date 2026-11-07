@@ -8,7 +8,7 @@ Le moteur de jeu de [ScratchCode](https://scratchcode.web.app) : des projets 2D,
 - **Un éditeur organisé comme les grands moteurs** : Hiérarchie, vue Scène avec outils Déplacer, Pivoter et Redimensionner, vue Jeu, Inspecteur avec composants (Rendu, Lumière, Caméra, Collision, Physique, Script), panneau Projet, Console, boutons Lecture, Pause et Image suivante, Annuler et Rétablir.
 - **Le code** : un script `.sc` par objet. `when app run` remplace le drapeau vert. Les projets 3D ont plus de 50 nouveaux blocs (`move forward (0.1)`, `jump with force (6)`, `camera follow [myself] distance (7) height (3)`...).
 - **Les assets** : modèles `.glb` `.gltf` `.obj` `.fbx` `.stl` `.ply` `.dae` (avec leurs animations), images et sons, à glisser dans le panneau Projet.
-- **Le format `.scratchcode`** : un projet est un dossier (`project.scratchcode`, `scenes/`, `scripts/`, `assets/`), et Exporter le transforme en un seul fichier `.scratchcode` à partager.
+- **Le format `.maxycode`** : un projet est un dossier (`project.maxycode`, `scenes/`, `scripts/`, `assets/`), et Exporter le transforme en un seul fichier `.maxycode` à partager. Les anciens projets `.scratchcode` s'ouvrent toujours et sont convertis automatiquement.
 - **Les plugins** (nouveau en 2.0) : menu **Plugins → Ajouter un plugin**. Un plugin ajoute des boutons et des outils au studio (générateurs de niveaux, vérification des builds, assistants...). Deux exemples sont fournis : le Vérificateur de build et le Bâtisseur d'arène. Pour créer le tien, lis [PLUGINS.md](PLUGINS.md).
 
 MaxyStudio s'appelait auparavant ScratchCode Studio. Les projets `.scratchcode` existants s'ouvrent sans changement, et la liste des projets récents est reprise automatiquement.
