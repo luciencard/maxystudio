@@ -87,6 +87,21 @@
               </div>
             </div>
           </div>
+          <div class="un-view" id="uiView" hidden>
+            <div class="un-scenebar">
+              <span class="un-dim">Ajouter :</span>
+              <button class="un-chip" data-uiadd="text">Texte</button>
+              <button class="un-chip" data-uiadd="button">Bouton</button>
+              <button class="un-chip" data-uiadd="image">Image</button>
+              <button class="un-chip" data-uiadd="bar">Barre</button>
+              <button class="un-chip" data-uiadd="panel">Panneau</button>
+              <span class="grow"></span>
+              <button class="un-chip" id="uiBack" title="Mettre l'élément derrière les autres">Derrière</button>
+              <button class="un-chip" id="uiFront" title="Mettre l'élément devant les autres">Devant</button>
+            </div>
+            <div class="ui-wrap"><div class="ui-list" id="uiList"></div><div class="ui-box" id="uiBox"></div></div>
+            <div class="un-hint">Glisse pour déplacer · Coins : redimensionner · Double-clic : changer le texte · Suppr : effacer</div>
+          </div>
           <div class="un-view" id="codeView" hidden><div id="monaco"></div><div class="un-insp-badge" id="inspection"></div></div>
         </div>
       </section>
@@ -105,6 +120,7 @@
           <button class="un-tab active" data-btab="project"><span data-ic="folder" data-size="13"></span>Projet</button>
           <button class="un-tab" data-btab="console"><span data-ic="terminal" data-size="13"></span>Console <span class="un-count" id="logCount"></span></button>
           <button class="un-tab" data-btab="debug"><span data-ic="bug" data-size="13"></span>Débogueur</button>
+          <button class="un-tab" data-btab="anim"><span data-ic="clock" data-size="13"></span>Animation</button>
           <button class="un-tab" data-btab="library"><span data-ic="box" data-size="13"></span>Bibliothèque</button>
           <span class="grow"></span>
           <div class="un-btools" id="projTools">
@@ -112,6 +128,7 @@
             <button class="un-btn sm" id="createBtn"><span data-ic="plus" data-size="13"></span>Créer</button>
             <div class="un-search sm"><span data-ic="search" data-size="12"></span><input id="assetSearch" placeholder="Rechercher" spellcheck="false"></div>
           </div>
+          <div class="un-btools" id="animTools" hidden></div>
           <div class="un-btools" id="libTools" hidden>
             <div class="lib-types" id="libTypes"></div>
             <select class="un-select sm" id="libPack"></select>
@@ -142,6 +159,7 @@
           </div>
           <div class="un-console" id="consoleView" hidden></div>
           <div class="un-debug" id="debugView" hidden></div>
+          <div class="un-anim" id="animView" hidden></div>
           <div class="un-library" id="libraryView" hidden>
             <div class="lib-bar" id="libBar"><span id="libInfo">Chargement de la bibliothèque…</span><span class="grow"></span><span id="libActions"></span></div>
             <div class="lib-grid" id="libGrid"></div>

@@ -29,6 +29,10 @@ export class SceneView2D {
   reloadImages() { this.images.clear(); this.draw(); }
 
   load(scene) { this.scene = scene; this.draw(); }
+  // Aperçu d'animation : valeurs affichées à la place de celles de la scène, sans la modifier
+  setOverride(id, vals) { if (!this.over) this.over = new Map(); this.over.set(id, vals); this.draw(); }
+  clearOverrides() { if (this.over && this.over.size) { this.over.clear(); this.draw(); } }
+  ov(o) { const v = this.over && this.over.get(o.id); return v ? { ...o, ...v } : o; }
   updateObject() { this.draw(); }
   setTransform() { this.draw(); }
   addObject() { this.draw(); }
@@ -58,7 +62,7 @@ export class SceneView2D {
   hit(x, y) {
     const objs = (this.scene && this.scene.objects) || [];
     for (let i = objs.length - 1; i >= 0; i--) {
-      const o = objs[i];
+      const o = this.ov(objs[i]);
       const { w, h } = this.spriteRect(o);
       if (Math.abs(x - o.x) <= w / 2 && Math.abs(y - o.y) <= h / 2) return o;
     }
@@ -87,7 +91,8 @@ export class SceneView2D {
       g.beginPath(); g.moveTo(0, -180); g.lineTo(0, 180); g.moveTo(-240, 0); g.lineTo(240, 0); g.stroke();
     }
     g.beginPath(); g.rect(-240, -180, 480, 360); g.clip();
-    for (const o of (this.scene && this.scene.objects) || []) {
+    for (const o0 of (this.scene && this.scene.objects) || []) {
+      const o = this.ov(o0);
       const { img, w: sw, h: sh } = this.spriteRect(o);
       g.save();
       g.translate(o.x, -o.y);
@@ -103,7 +108,8 @@ export class SceneView2D {
     }
     g.restore();
     // Sélection
-    const sel = this.selected && ((this.scene && this.scene.objects) || []).find(o => o.id === this.selected);
+    const sel0 = this.selected && ((this.scene && this.scene.objects) || []).find(o => o.id === this.selected);
+    const sel = sel0 && this.ov(sel0);
     if (sel) {
       const { w: sw, h: sh } = this.spriteRect(sel);
       g.strokeStyle = '#ffa733'; g.lineWidth = 2;

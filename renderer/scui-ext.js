@@ -49,7 +49,141 @@
     els.clear();
     if (layer) { layer.className = 'scui-layer'; layer.style.background = ''; }
   }
-  runtime.on('PROJECT_START', clearAll);
+
+  // ---------- Interface dessinée dans l'éditeur (onglet Interface de MaxyStudio) ----------
+  // Même mise en forme que ui-editor.js : positions en % de l'écran, textes pour un écran de 480 px de large.
+  let hudLayer = null;
+  const hud = new Map();
+  function uiStyle(e) {
+    const u = n => `calc(var(--u, 1px) * ${+n || 0})`;
+    const al = e.type === 'bar' || e.align === 'left' ? 'flex-start' : e.align === 'right' ? 'flex-end' : 'center';
+    const st = {
+      position: 'absolute', left: (+e.x - +e.w / 2) + '%', top: (+e.y - +e.h / 2) + '%', width: (+e.w) + '%', height: (+e.h) + '%',
+      boxSizing: 'border-box', display: e.visible === false ? 'none' : 'flex', alignItems: 'center', justifyContent: al, textAlign: e.align || 'center',
+      padding: e.type === 'bar' ? u(3) : `0 ${u(8)}`, overflow: 'hidden', whiteSpace: 'pre-wrap', lineHeight: '1.15', margin: '0',
+      fontFamily: '"Segoe UI", system-ui, sans-serif', fontWeight: e.bold ? '700' : '500', fontSize: u(e.size || 18), color: e.color || '#ffffff',
+      background: e.bgOn ? (e.bg || '#1f2430') : 'transparent', borderRadius: u(e.radius), border: '0',
+      textShadow: e.shadow ? `0 ${u(1.5)} ${u(3)} rgba(0,0,0,.6)` : 'none', opacity: String(e.opacity ?? 1),
+      cursor: e.type === 'button' ? 'pointer' : 'default', boxShadow: e.type === 'button' && e.bgOn ? `0 ${u(3)} 0 rgba(0,0,0,.25)` : 'none',
+      pointerEvents: e.type === 'button' ? 'auto' : 'none'
+    };
+    if (e.type === 'image') st.background = e.image ? `center / contain no-repeat url("${resolveUrl(e.image)}")` : 'transparent';
+    return st;
+  }
+  function hudRoot() {
+    if (hudLayer && hudLayer.isConnected) return hudLayer;
+    const box = Scratch.renderer.canvas.parentElement;
+    if (getComputedStyle(box).position === 'static') box.style.position = 'relative';
+    hudLayer = document.createElement('div');
+    hudLayer.className = 'scui-hud';
+    Object.assign(hudLayer.style, { position: 'absolute', inset: '0', zIndex: '4', pointerEvents: 'none', overflow: 'hidden' });
+    box.appendChild(hudLayer);
+    const fit = () => hudLayer.style.setProperty('--u', (box.clientWidth / 480) + 'px');
+    new ResizeObserver(fit).observe(box);
+    fit();
+    return hudLayer;
+  }
+  function buildHud() {
+    for (const el of hud.values()) el.remove();
+    hud.clear();
+    const list = (project().scene && project().scene.ui) || [];
+    if (!list.length) return;
+    const root = hudRoot();
+    for (const e of list) {
+      const el = document.createElement(e.type === 'button' ? 'button' : 'div');
+      Object.assign(el.style, uiStyle(e));
+      el.dataset.ui = e.type;
+      if (e.type === 'bar') {
+        const f = document.createElement('div');
+        Object.assign(f.style, { height: '100%', width: Math.max(0, Math.min(100, +e.value || 0)) + '%', background: e.barColor || '#3ddc84', borderRadius: `calc(var(--u, 1px) * ${Math.max(0, (+e.radius || 0) - 2)})`, transition: 'width .15s' });
+        el.appendChild(f);
+      } else if (e.type !== 'image') el.textContent = e.text || '';
+      if (e.type === 'button') {
+        el.tabIndex = -1;
+        el.onclick = () => { clicked = { id: e.name, t: performance.now() }; runtime.startHats('scuiapp_whenButton'); };
+        el.onmousedown = ev => ev.stopPropagation();
+      }
+      root.appendChild(el);
+      hud.set(e.name, el);
+    }
+  }
+  const getEl = id => { id = Cast.toString(id); return els.get(id) || hud.get(id) || [...hud.entries()].find(([k]) => k.toLowerCase() === id.toLowerCase())?.[1]; };
+  runtime.on('PROJECT_START', () => { clearAll(); buildHud(); startAnims(); });
+
+  // ---------- Clips d'animation (assets/animations/*.anim, éditeur d'animation de MaxyStudio) ----------
+  // Même calcul que anim-editor.js.
+  const clips = new Map();
+  const anims = new Map();
+  let animOn = false, animLast = 0;
+  const clipRel = name => { name = Cast.toString(name).trim(); return /\.anim$/i.test(name) ? name : `assets/animations/${name}.anim`; };
+  function loadClip(rel) {
+    if (!clips.has(rel)) clips.set(rel, fetch(resolveUrl(rel)).then(r => (r.ok ? r.json() : null)).catch(() => null));
+    return clips.get(rel);
+  }
+  function sampleClip(clip, t) {
+    const out = {};
+    for (const [prop, keys] of Object.entries(clip.tracks || {})) {
+      if (!keys.length) continue;
+      if (t <= keys[0][0]) { out[prop] = keys[0][1]; continue; }
+      const last = keys[keys.length - 1];
+      if (t >= last[0]) { out[prop] = last[1]; continue; }
+      let i = 0;
+      while (i < keys.length - 2 && keys[i + 1][0] <= t) i++;
+      const [t0, v0] = keys[i], [t1, v1] = keys[i + 1];
+      let f = t1 > t0 ? (t - t0) / (t1 - t0) : 1;
+      if (clip.ease) f = f * f * (3 - 2 * f);
+      out[prop] = v0 + (v1 - v0) * f;
+    }
+    return out;
+  }
+  function applyPose(name, vals) {
+    const W = window.__sc3d;
+    if (project().type === '3d') {
+      if (!W) return;
+      let obj = null;
+      for (const o of W.objects.values()) if (o.name === name && o.parent) { obj = o; break; }
+      if (!obj) return;
+      for (const [k, v] of Object.entries(vals)) {
+        const [p, i] = k.split('.');
+        if (p === 'position') obj.position.setComponent(+i, v);
+        else if (p === 'rotation') obj.rotation[['x', 'y', 'z'][+i]] = v * Math.PI / 180;
+        else if (p === 'scale') obj.scale.setComponent(+i, v);
+      }
+      return;
+    }
+    const t = runtime.getSpriteTargetByName(name);
+    if (!t) return;
+    if ('x' in vals || 'y' in vals) t.setXY('x' in vals ? vals.x : t.x, 'y' in vals ? vals.y : t.y);
+    if ('size' in vals) t.setSize(vals.size);
+    if ('direction' in vals) t.setDirection(vals.direction);
+  }
+  function animTick(now) {
+    requestAnimationFrame(animTick);
+    const dt = animLast ? Math.min(0.1, (now - animLast) / 1000) : 0;
+    animLast = now;
+    if (!animOn || window.__scPaused || !anims.size) return;
+    for (const [name, a] of anims) {
+      if (!a.playing) continue;
+      const L = +a.clip.length || 1;
+      a.t += dt;
+      if (a.t >= L) {
+        if (a.clip.loop && !a.once) a.t %= L;
+        else { a.t = L; a.playing = false; }
+      }
+      applyPose(name, sampleClip(a.clip, a.t));
+    }
+    runtime.requestRedraw();
+  }
+  requestAnimationFrame(animTick);
+  function startAnims() {
+    anims.clear(); clips.clear(); animOn = true;
+    const sc = project().scene || {};
+    for (const o of sc.objects || []) {
+      if (!o.animator || !o.animator.clip || o.animator.autoplay === false) continue;
+      loadClip(o.animator.clip).then(c => { if (c && animOn) anims.set(o.name, { clip: c, t: 0, playing: true, once: false }); });
+    }
+  }
+  runtime.on('PROJECT_STOP_ALL', () => { animOn = false; });
 
   const S = (v = '') => ({ type: Scratch.ArgumentType.STRING, defaultValue: v });
   const cmd = (opcode, text, args = {}) => ({ opcode, blockType: Scratch.BlockType.COMMAND, text, arguments: args });
@@ -69,6 +203,14 @@
           { opcode: 'textOf', blockType: Scratch.BlockType.REPORTER, text: 'text of [ID]', arguments: { ID: S('nom') }, disableMonitor: true },
           cmd('setStyle', 'set [PROP] of [ID] to [VALUE]', { PROP: { type: Scratch.ArgumentType.STRING, menu: 'props', defaultValue: 'color' }, ID: S('ok'), VALUE: S('#4c97ff') }),
           cmd('removeEl', 'remove element [ID]', { ID: S('info') }),
+          cmd('playClip', 'play clip [NAME]', { NAME: S('Porte') }),
+          cmd('playClipOnce', 'play clip [NAME] once', { NAME: S('Porte') }),
+          cmd('stopClip', 'stop clip'),
+          { opcode: 'clipPlaying', blockType: Scratch.BlockType.BOOLEAN, text: 'clip playing?' },
+          cmd('showEl', 'show element [ID]', { ID: S('Menu') }),
+          cmd('hideEl', 'hide element [ID]', { ID: S('Menu') }),
+          cmd('setBar', 'set bar [ID] to [V] %', { ID: S('Vie'), V: { type: Scratch.ArgumentType.NUMBER, defaultValue: 50 } }),
+          cmd('setImage', 'set image of [ID] to [ASSET]', { ID: S('Image'), ASSET: S('assets/image.png') }),
           cmd('clearUi', 'clear interface'),
           cmd('layout', 'arrange elements in [MODE]', { MODE: { type: Scratch.ArgumentType.STRING, menu: 'modes', defaultValue: 'column' } }),
           cmd('background', 'set app background to [COLOR]', { COLOR: S('#f4f1ff') }),
@@ -111,16 +253,36 @@
     }
     addImage(a) { const el = document.createElement('img'); el.className = 'scui-img'; el.alt = ''; el.src = resolveUrl(Cast.toString(a.ASSET)); put(a.ID, el); }
     whenButton(a) { return Cast.toString(a.ID) === clicked.id && performance.now() - clicked.t < 500; }
-    setText(a) { const el = els.get(Cast.toString(a.ID)); if (!el) return; if (el.tagName === 'INPUT') el.value = Cast.toString(a.TEXT); else el.textContent = Cast.toString(a.TEXT); }
-    textOf(a) { const el = els.get(Cast.toString(a.ID)); return el ? (el.tagName === 'INPUT' ? el.value : el.textContent) : ''; }
+    setText(a) { const el = getEl(a.ID); if (!el || el.dataset.ui === 'bar' || el.dataset.ui === 'image') return; if (el.tagName === 'INPUT') el.value = Cast.toString(a.TEXT); else el.textContent = Cast.toString(a.TEXT); }
+    textOf(a) { const el = getEl(a.ID); return el ? (el.tagName === 'INPUT' ? el.value : el.textContent) : ''; }
     setStyle(a) {
-      const el = els.get(Cast.toString(a.ID)); if (!el) return;
+      const el = getEl(a.ID); if (!el) return;
       const v = Cast.toString(a.VALUE);
       if (a.PROP === 'color') el.style.color = v;
       else if (a.PROP === 'background') el.style.background = v;
       else if (a.PROP === 'text size') el.style.fontSize = (Cast.toNumber(v) || 15) + 'px';
       else if (a.PROP === 'width') el.style.width = (Cast.toNumber(v) || 0) ? Cast.toNumber(v) + 'px' : '';
-      else if (a.PROP === 'visible') el.style.display = /^(false|no|non|off|0)$/i.test(v) ? 'none' : '';
+      else if (a.PROP === 'visible') el.style.display = /^(false|no|non|off|0)$/i.test(v) ? 'none' : (el.dataset.ui ? 'flex' : '');
+    }
+    playClip(a, u, once = false) {
+      const name = u && u.target && !u.target.isStage ? u.target.getName() : '';
+      if (!name) return;
+      return loadClip(clipRel(a.NAME)).then(c => {
+        if (!c) return runtime.emit('SC_PRINT', { text: `Clip introuvable : ${clipRel(a.NAME)}`, level: 'error', who: name });
+        animOn = true;
+        anims.set(name, { clip: c, t: 0, playing: true, once });
+      });
+    }
+    playClipOnce(a, u) { return this.playClip(a, u, true); }
+    stopClip(a, u) { if (u && u.target) anims.delete(u.target.getName()); }
+    clipPlaying(a, u) { const x = u && u.target && anims.get(u.target.getName()); return !!(x && x.playing); }
+    showEl(a) { const el = getEl(a.ID); if (el) el.style.display = el.dataset.ui ? 'flex' : ''; }
+    hideEl(a) { const el = getEl(a.ID); if (el) el.style.display = 'none'; }
+    setBar(a) { const el = getEl(a.ID); const f = el && el.dataset.ui === 'bar' && el.firstChild; if (f) f.style.width = Math.max(0, Math.min(100, Cast.toNumber(a.V))) + '%'; }
+    setImage(a) {
+      const el = getEl(a.ID); if (!el) return;
+      const src = resolveUrl(Cast.toString(a.ASSET));
+      if (el.tagName === 'IMG') el.src = src; else el.style.background = `center / contain no-repeat url("${src}")`;
     }
     removeEl(a) { const el = els.get(Cast.toString(a.ID)); if (el) { el.remove(); els.delete(Cast.toString(a.ID)); } }
     clearUi() { clearAll(); }

@@ -3,6 +3,8 @@ import * as core from './sc3d-core.js';
 import { SceneView3D } from './scene-view3d.js';
 import { SceneView2D } from './scene-view2d.js';
 import { initPlugins } from './plugins.js';
+import { UiEditor, UI_TYPES, UI_ICON, defaultUiElement } from './ui-editor.js';
+import { AnimEditor, newClip } from './anim-editor.js';
 import { compileMaxyCode, originalLine, originOf, findImports, STDLIB } from './maxycode.js';
 
 hydrateIcons();
@@ -21,7 +23,7 @@ const LUTIN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96
 const S = {
   config: null, type: '2d', tree: [], base: '', scenePath: 'scenes/Main.scene', scene: null,
   sel: null, selAsset: null, mode: 'edit', paused: false, undo: [], redo: [], lastSnap: { key: '', t: 0 },
-  models: new Map(), saved: new Map(), tabs: ['scene', 'game'], active: 'scene', folder: 'assets',
+  models: new Map(), saved: new Map(), tabs: ['scene', 'ui', 'game'], active: 'scene', selUi: null, folder: 'assets',
   folderOpen: new Set(['', 'assets', 'scripts', 'scenes']), collapsed: new Set(), closedComps: new Set(), sculpt: { tool: null, radius: 4, strength: 1 },
   logs: [], levels: { log: true, warn: true, error: true }, collapse: false, clearOnPlay: true, problems: {}
 };
@@ -95,11 +97,12 @@ function kindOf(rel) {
   if (e === 'sc') return 'sc';
   if (e === 'scene') return 'scene';
   if (e === 'prefab') return 'prefab';
+  if (e === 'anim') return 'anim';
   if (e === 'md') return 'md';
   if (e === 'json' || e === 'maxycode' || e === 'scratchcode') return 'json';
   return 'file';
 }
-const KIND_ICON = { model: 'box', image: 'image', sound: 'volume', sc: 'fileCode', scene: 'scene', prefab: 'copy', md: 'book', json: 'braces', file: 'file', dir: 'folder' };
+const KIND_ICON = { model: 'box', image: 'image', sound: 'volume', sc: 'fileCode', scene: 'scene', prefab: 'copy', anim: 'clock', md: 'book', json: 'braces', file: 'file', dir: 'folder' };
 async function refreshTree() {
   const p = await studio.readProject(DIR);
   S.config = p.config; S.tree = p.tree; S.base = p.assetBase;
@@ -110,6 +113,7 @@ async function writeText(rel, text) { markOwnWrite(rel); await studio.writeFile(
 // ---------------- Scène : chargement, sauvegarde, annuler ----------------
 function normalizeScene(sc = S.scene) {
   sc.objects = sc.objects || [];
+  sc.ui = sc.ui || [];
   if (S.type === '3d') {
     sc.environment = Object.assign(core.defaultEnvironment(), sc.environment || {});
     for (const o of sc.objects) {
@@ -171,7 +175,10 @@ function select(id, { fromView } = {}) {
   if (S.sculpt.tool && id !== S.sel) setSculpt(null, false);
   S.sel = id;
   S.selAsset = null;
+  if (id) S.selUi = null;
   view.select(id && id[0] !== '_' ? id : null);
+  if (uiEd) uiEd.render();
+  if (anim && !$('#animView').hidden) { anim.render(); anim.apply(); }
   renderHier(); renderInsp(); renderAssets();
   if (plugins) plugins.emit('select', id);
 }
@@ -217,6 +224,7 @@ async function createObject(kind, extra = {}, parent = null) {
   return def;
 }
 async function duplicateSel() {
+  if (S.selUi && S.active === 'ui') return duplicateUi();
   const o = findObj(S.sel);
   if (!o || S.mode !== 'edit') return;
   snapshot();
@@ -237,6 +245,7 @@ async function duplicateSel() {
   saveScene();
 }
 async function deleteSel() {
+  if (S.selUi && S.active === 'ui') return deleteUi();
   const o = findObj(S.sel);
   if (!o || S.mode !== 'edit') return;
   snapshot();
@@ -299,6 +308,9 @@ function applyChange(target, path, value, how) {
   else if (how === 'rebuild' || how === 'rebuild+insp') view.updateObject(target);
   else if (how === 'name') { target.name = uniqueName(String(value).trim() || 'Objet', target.id); view.updateObject(target); renderHier(); }
   else if (how === 'draw') view.updateObject(target);
+  else if (how === 'ui') uiEd.render();
+  else if (how === 'ui+insp') { uiEd.render(); renderInsp(); }
+  else if (how === 'uiName') { target.name = uniqueUiName(String(value).trim() || 'Élément', target.id); uiEd.render(); }
   else if (how === 'terrainGen') { core.generateTerrain(target.terrain); view.updateObject(target); }
   else if (how === 'particlePreset') { Object.assign(target.particles, core.particlePreset(value)); view.updateObject(target); renderInsp(); }
   if (how === 'rebuild+insp') renderInsp();
@@ -309,6 +321,7 @@ function applyChange(target, path, value, how) {
 // ---------------- Hiérarchie ----------------
 const OBJ_ICON = { terrain: 'mountain', particles: 'sparkles', empty: 'empty', cube: 'box', sphere: 'sphere', cylinder: 'box', cone: 'box', capsule: 'box', plane: 'grid', torus: 'sphere', model: 'box', light: 'light', camera: 'camera', sprite: 'sprite' };
 function renderHier() {
+  if (uiEd) uiEd.render();
   const box = $('#hier');
   if (!S.scene) { box.innerHTML = ''; return; }
   const q = $('#hierSearch').value.trim().toLowerCase();
@@ -437,6 +450,8 @@ function renderInsp() {
   const box = $('#insp');
   if (!S.scene) { box.innerHTML = ''; return; }
   if (S.selAsset) return renderAssetInsp(box, S.selAsset);
+  const ue = S.selUi && (S.scene.ui || []).find(e => e.id === S.selUi);
+  if (ue) return renderUiInsp(box, ue);
   const o = findObj(S.sel);
   if (o && S.type === '3d') return renderObj3D(box, o);
   if (o) return renderSprite(box, o);
@@ -525,6 +540,7 @@ function renderObj3D(box, o) {
   if (o.rigidbody && o.rigidbody.enabled) html += comp('rigidbody', 'physics', 'Physique', `${lbl('Gravité', 'rigidbody.gravity', 0.02)}${num('rigidbody.gravity', o.rigidbody.gravity ?? 1, 0.1)}${lbl('Rebond')}${range('rigidbody.bounce', o.rigidbody.bounce || 0, 0, 1, 0.05)}
     <div class="full in-note">L'objet tombe et se pose sur les objets avec collision. Blocs utiles : <code>jump with force (6)</code>, <code>set velocity to x: y: z:</code>.</div>`, { remove: 'rigidbody' });
   if (o.prefab) html += prefabComp(o);
+  if (o.animator) html += animComp(o);
   if (o.script) html += scriptComp(o);
   html += `<div class="in-add"><button class="un-btn" data-act="addComp">${icon('plus', 13)}Ajouter un composant</button></div>`;
   box.innerHTML = html;
@@ -548,7 +564,9 @@ function renderSprite(box, o) {
   html += comp('costumes', 'image', 'Costumes', thumbs(o.costumes, 'image'));
   html += comp('sounds', 'volume', 'Sons', thumbs(o.sounds, 'sound'));
   if (o.prefab) html += prefabComp(o);
+  if (o.animator) html += animComp(o);
   html += scriptComp(o);
+  html += `<div class="in-add"><button class="un-btn" data-act="addAnim"${o.animator ? ' disabled' : ''}>${icon('clock', 13)}Ajouter une animation</button></div>`;
   box.innerHTML = html;
   box.querySelectorAll('[data-up] .ic').forEach(i => { i.style.transform = 'rotate(180deg)'; });
   bindInsp(box, o, k => k === 'name' ? 'name' : 'draw');
@@ -648,6 +666,7 @@ function bindInsp(root, target, howOf, scope) {
     if (r === 'rigidbody') target.rigidbody.enabled = false;
     else if (r === 'collider') target.collider = false;
     else if (r === 'script') target.script = '';
+    else if (r === 'animator') delete target.animator;
     if (S.type === '3d' && target.id) view.updateObject(target);
     saveScene(); renderInsp(); renderHier();
   });
@@ -655,12 +674,15 @@ function bindInsp(root, target, howOf, scope) {
   act('openScript', () => target.script && openScript(target.script));
   act('newScript', () => newScriptFor(target));
   act('prefabApply', () => applyPrefab(target.id));
+  act('openAnim', () => openAnim(target.animator && target.animator.clip));
+  act('addAnim', () => addAnimTo(target));
   act('terrainSeed', () => { snapshot(); target.terrain.seed = Math.floor(Math.random() * 99999); core.generateTerrain(target.terrain); view.updateObject(target); saveScene(); renderInsp(); });
   act('prefabUpdate', () => updateInstances(target.prefab));
   act('prefabDetach', () => detachPrefab(target.id));
   act('addComp', e => menuAt(e.currentTarget, [
     'Ajouter un composant',
     { label: 'Physique', ic: 'physics', disabled: target.rigidbody && target.rigidbody.enabled, fn: () => { snapshot(); target.rigidbody = { enabled: true, gravity: 1, bounce: 0 }; if (!target.collider) target.collider = true; saveScene(); renderInsp(); } },
+    { label: 'Animation', ic: 'clock', disabled: !!target.animator, fn: () => addAnimTo(target) },
     { label: 'Collision', ic: 'shield', disabled: !!target.collider, fn: () => { snapshot(); target.collider = true; saveScene(); renderInsp(); } },
     { label: 'Script existant…', ic: 'fileCode', disabled: !!target.script || !filesBy(['sc']).length, fn: () => { snapshot(); target.script = filesBy(['sc'])[0]; saveScene(); renderInsp(); renderHier(); } },
     { label: 'Nouveau script', ic: 'plus', disabled: !!target.script, fn: () => newScriptFor(target) }
@@ -815,6 +837,7 @@ function renderAssets() {
       if (k === 'sc' || k === 'md' || k === 'json') openScript(p);
       else if (k === 'scene') openScene(p);
       else if (k === 'prefab') placePrefab(p);
+      else if (k === 'anim') openAnim(p);
       else if (k === 'model' && S.type === '3d') createObject('model', { name: stem(p), model: p });
       else if (k === 'image' && S.type !== '3d') createObject('sprite', { costume: p });
       else selectAsset(p);
@@ -988,25 +1011,28 @@ function closeTab(rel, force) {
   if (force && m) { m.dispose(); S.models.delete(rel); }
   if (S.active === rel) activateTab('scene'); else renderTabs();
 }
+const FIXED_TABS = ['scene', 'ui', 'game'];
 function renderTabs() {
   const box = $('#centerTabs');
   box.innerHTML = S.tabs.map(t => {
-    const fixed = t === 'scene' || t === 'game';
-    const label = t === 'scene' ? 'Scène' : t === 'game' ? 'Jeu' : base(t);
-    const ic = t === 'scene' ? (S.type === '3d' ? 'box' : 'image') : t === 'game' ? 'gamepad' : 'fileCode';
+    const fixed = FIXED_TABS.includes(t);
+    const label = t === 'scene' ? 'Scène' : t === 'game' ? 'Jeu' : t === 'ui' ? 'Interface' : base(t);
+    const ic = t === 'scene' ? (S.type === '3d' ? 'box' : 'image') : t === 'game' ? 'gamepad' : t === 'ui' ? 'app' : 'fileCode';
     return `<button class="un-tab${S.active === t ? ' active' : ''}" data-tab="${esc(t)}" title="${esc(fixed ? label : t)}">${icon(ic, 13)}<span>${esc(label)}</span>${fixed ? '' : isDirty(t) ? '<span class="dot"></span>' : `<span class="x" data-close>${icon('x', 11)}</span>`}</button>`;
   }).join('');
   box.querySelectorAll('[data-tab]').forEach(b => {
     b.onclick = e => e.target.closest('[data-close]') ? closeTab(b.dataset.tab) : activateTab(b.dataset.tab);
-    b.onauxclick = e => { if (e.button === 1 && !['scene', 'game'].includes(b.dataset.tab)) closeTab(b.dataset.tab); };
+    b.onauxclick = e => { if (e.button === 1 && !FIXED_TABS.includes(b.dataset.tab)) closeTab(b.dataset.tab); };
   });
 }
 function activateTab(t) {
   S.active = t;
   $('#sceneView').hidden = t !== 'scene';
   $('#gameView').hidden = t !== 'game';
-  $('#codeView').hidden = t === 'scene' || t === 'game';
-  if (t !== 'scene' && t !== 'game' && editor) {
+  $('#uiView').hidden = t !== 'ui';
+  $('#codeView').hidden = FIXED_TABS.includes(t);
+  if (t === 'ui' && uiEd) uiEd.render();
+  if (!FIXED_TABS.includes(t) && editor) {
     editor.setModel(S.models.get(t));
     renderBreakpoints(t);
     updateInspection();
@@ -1057,6 +1083,9 @@ function showBottom(tab) {
   $('#projTools').hidden = tab !== 'project';
   $('#consoleTools').hidden = tab !== 'console';
   $('#libTools').hidden = tab !== 'library';
+  $('#animView').hidden = tab !== 'anim';
+  $('#animTools').hidden = tab !== 'anim';
+  if (anim) { if (tab === 'anim') { anim.render(); anim.apply(); } else { anim.stop(); anim.restore(); } }
   if (tab === 'console') renderConsole();
   if (tab === 'library') openLibrary();
   if (tab === 'debug') renderDebug();
@@ -1336,6 +1365,169 @@ function detachPrefab(id) {
 }
 
 
+
+// ---------------- Interface (HUD) ----------------
+let uiEd = null;
+function uniqueUiName(name, exceptId) {
+  const used = new Set((S.scene.ui || []).filter(e => e.id !== exceptId).map(e => e.name.toLowerCase()));
+  if (!used.has(name.toLowerCase())) return name;
+  const stemName = name.replace(/\s*\(\d+\)$/, '');
+  for (let i = 2; ; i++) if (!used.has(`${stemName} (${i})`.toLowerCase())) return `${stemName} (${i})`;
+}
+function uiBackground() {
+  if (S.type === '3d') { const e = S.scene.environment || {}; return `linear-gradient(${e.skyTop || '#5d9fe8'}, ${e.skyBottom || '#dcecfb'} 70%, #6b8f4e 70%)`; }
+  const bd = S.scene.stage && S.scene.stage.backdrops && S.scene.stage.backdrops[0];
+  return bd ? `#fff center / cover no-repeat url("${resolveUrl(bd)}")` : '#ffffff';
+}
+function selectUi(id) {
+  S.selUi = id || null;
+  if (id) { S.sel = null; S.selAsset = null; view.select(null); renderHier(); }
+  uiEd.render(); renderInsp();
+}
+function addUi(type) {
+  if (S.mode !== 'edit') return toast('Arrête le jeu pour modifier l\'interface.', true);
+  snapshot();
+  const label = { text: 'Texte', button: 'Bouton', image: 'Image', bar: 'Barre', panel: 'Panneau' }[type];
+  const e = defaultUiElement(type, uniqueUiName(label), core.newId());
+  if (type === 'image') e.image = filesBy(core.IMAGE_EXT)[0] || '';
+  S.scene.ui.push(e);
+  saveScene(); activateTab('ui'); selectUi(e.id);
+  status(`« ${e.name} » ajouté à l'interface`);
+}
+function deleteUi() {
+  const i = S.scene.ui.findIndex(e => e.id === S.selUi);
+  if (i < 0 || S.mode !== 'edit') return;
+  snapshot();
+  const [e] = S.scene.ui.splice(i, 1);
+  S.selUi = null; saveScene(); uiEd.render(); renderInsp();
+  status(`« ${e.name} » supprimé`);
+}
+function duplicateUi() {
+  const e = S.scene.ui.find(x => x.id === S.selUi);
+  if (!e || S.mode !== 'edit') return;
+  snapshot();
+  const c = { ...JSON.parse(JSON.stringify(e)), id: core.newId(), name: uniqueUiName(e.name), x: Math.min(100, e.x + 3), y: Math.min(100, e.y + 3) };
+  S.scene.ui.splice(S.scene.ui.indexOf(e) + 1, 0, c);
+  saveScene(); selectUi(c.id);
+}
+function moveUi(front) {
+  const list = S.scene.ui, i = list.findIndex(e => e.id === S.selUi);
+  if (i < 0) return;
+  snapshot();
+  const [e] = list.splice(i, 1);
+  front ? list.push(e) : list.unshift(e);
+  saveScene(); uiEd.render();
+}
+function renderUiInsp(box, e) {
+  const images = [['', '(aucune)'], ...filesBy(core.IMAGE_EXT).map(f => [f, f])];
+  const hasText = e.type === 'text' || e.type === 'button' || e.type === 'panel';
+  let html = `<div class="in-head"><span class="big">${icon(UI_ICON[e.type] || 'app', 18)}</span><input type="checkbox" data-k="visible" data-t="check" title="Visible au départ"${e.visible !== false ? ' checked' : ''} style="accent-color:var(--accent)"><input class="name" data-k="name" data-t="name" value="${esc(e.name)}" spellcheck="false"></div>`;
+  html += comp('uiPos', 'move', 'Position et taille', `${lbl('Centre X (%)', 'x', 0.2)}${num('x', e.x, 0.5)}${lbl('Centre Y (%)', 'y', 0.2)}${num('y', e.y, 0.5)}
+    ${lbl('Largeur (%)', 'w', 0.2)}${num('w', e.w, 0.5)}${lbl('Hauteur (%)', 'h', 0.2)}${num('h', e.h, 0.5)}
+    <div class="full in-note">En pourcentage de l'écran du jeu : l'interface garde sa place quelle que soit la taille de la fenêtre.</div>`);
+  let look = `${lbl('Type')}${selectF('type', e.type, UI_TYPES)}`;
+  if (hasText) look += `${lbl('Texte')}<textarea class="f" data-k="text" data-t="str" rows="2" spellcheck="false">${esc(e.text || '')}</textarea>
+      ${lbl('Taille du texte', 'size', 0.1)}${num('size', e.size, 1)}${lbl('Couleur du texte')}${color('color', e.color)}
+      ${lbl('Style')}<div class="in-row2">${check('bold', e.bold, 'Gras')}${check('shadow', e.shadow, 'Ombre')}</div>
+      ${lbl('Alignement')}${selectF('align', e.align || 'center', [['left', 'À gauche'], ['center', 'Centré'], ['right', 'À droite']])}`;
+  if (e.type === 'image') look += `${lbl('Image')}${selectF('image', e.image || '', images)}`;
+  if (e.type === 'bar') look += `${lbl('Valeur (%)')}${range('value', e.value ?? 100, 0, 100, 1)}${lbl('Couleur de la barre')}${color('barColor', e.barColor || '#3ddc84')}`;
+  look += `${lbl('Fond')}<div class="in-row2">${check('bgOn', e.bgOn, '')}${color('bg', e.bg || '#1f2430')}</div>
+    ${lbl('Arrondi', 'radius', 0.1)}${num('radius', e.radius || 0, 1)}${lbl('Opacité')}${range('opacity', e.opacity ?? 1, 0, 1, 0.01)}`;
+  html += comp('uiLook', 'palette', 'Apparence', look);
+  const n = esc(e.name);
+  const blocks = e.type === 'button' ? `<code>when button [${n}] clicked</code>, <code>set text of [${n}] to [OK]</code>`
+    : e.type === 'bar' ? `<code>set bar [${n}] to (50) %</code>`
+    : e.type === 'image' ? `<code>set image of [${n}] to [assets/image.png]</code>`
+    : `<code>set text of [${n}] to (join [Score : ] (score))</code>`;
+  html += comp('uiCode', 'fileCode', 'Dans le code', `<div class="full in-note">${blocks}, <code>show element [${n}]</code>, <code>hide element [${n}]</code>. Le nom de l'élément sert d'identifiant dans les blocs.</div>`);
+  box.innerHTML = html;
+  bindInsp(box, e, k => k === 'name' ? 'uiName' : k === 'type' ? 'ui+insp' : 'ui');
+}
+function initUiEditor() {
+  uiEd = new UiEditor($('#uiBox'), $('#uiList'), {
+    scene: () => S.scene,
+    selected: () => S.selUi,
+    select: id => selectUi(id),
+    before: () => snapshot(),
+    changed: live => { if (!live) { saveScene(); renderInsp(); } },
+    url: rel => resolveUrl(rel),
+    background: uiBackground,
+    editText: async e => {
+      const v = await ask(`Texte de « ${e.name} »`, e.text || '');
+      if (v == null) return;
+      snapshot(); e.text = v; saveScene(); uiEd.render(); renderInsp();
+    }
+  });
+  document.querySelectorAll('[data-uiadd]').forEach(b => b.onclick = () => addUi(b.dataset.uiadd));
+  $('#uiFront').onclick = () => moveUi(true);
+  $('#uiBack').onclick = () => moveUi(false);
+}
+
+
+// ---------------- Animation (clips et images clés) ----------------
+let anim = null;
+const clipFiles = () => allFiles().filter(f => f.endsWith('.anim')).sort();
+const clipWrites = new Map();
+function animComp(o) {
+  const a = o.animator;
+  const opts = [['', '(aucun)'], ...clipFiles().map(f => [f, stem(f)])];
+  return comp('animator', 'clock', 'Animation', `${lbl('Clip')}${selectF('animator.clip', a.clip || '', opts)}
+    ${lbl('Démarrage')}${check('animator.autoplay', a.autoplay !== false, 'Joue au lancement du jeu')}
+    <div class="full in-row2"><button class="un-btn sm" data-act="openAnim"${a.clip ? '' : ' disabled'}>${icon('edit', 12)}Modifier le clip</button></div>
+    <div class="full in-note">Blocs : <code>play clip [${esc(stem(a.clip || 'Clip'))}]</code>, <code>play clip [${esc(stem(a.clip || 'Clip'))}] once</code>, <code>stop clip</code>.</div>`, { remove: 'animator' });
+}
+function initAnimEditor() {
+  anim = new AnimEditor($('#animTools'), $('#animView'), {
+    type: S.type,
+    def: () => { const o = findObj(S.sel); return o && o.id && o.id[0] !== '_' ? o : null; },
+    clips: clipFiles,
+    read: async rel => { try { return JSON.parse(await studio.readFile(DIR, rel)); } catch { toast(`Clip illisible : ${rel}`, true); return null; } },
+    write: (rel, clip) => {
+      clearTimeout(clipWrites.get(rel));
+      clipWrites.set(rel, setTimeout(() => { writeText(rel, JSON.stringify(clip, null, 1)); savedNote('Clip enregistré'); }, 300));
+    },
+    choose: rel => openAnim(rel, false),
+    create: () => newAnimClip(),
+    link: (def, rel) => { snapshot(); def.animator = { clip: rel, autoplay: true }; saveScene(); renderInsp(); },
+    autoplay: (def, v) => { snapshot(); def.animator.autoplay = v; saveScene(); renderInsp(); },
+    preview: (def, vals) => {
+      if (S.type === '3d') {
+        const tmp = { ...def, position: [...def.position], rotation: [...def.rotation], scale: [...def.scale] };
+        for (const [k, v] of Object.entries(vals)) { const [p, i] = k.split('.'); if (tmp[p]) tmp[p][+i] = v; }
+        view.setTransform(tmp);
+      } else view.setOverride(def.id, vals);
+    },
+    restore: def => { if (S.type === '3d') view.setTransform(def); else view.clearOverrides(); },
+    icon, esc
+  });
+}
+async function openAnim(rel, show = true) {
+  if (show) showBottom('anim');
+  await anim.open(rel || null);
+}
+async function newAnimClip() {
+  const def = anim.ctx.def();
+  const name = await ask('Nom du nouveau clip', def ? `${def.name} anim` : 'Animation');
+  if (!name) return null;
+  const safe = name.trim().replace(/[\\/:*?"<>|]+/g, '-') || 'Animation';
+  let rel = `assets/animations/${safe}.anim`;
+  for (let i = 2; allFiles().includes(rel); i++) rel = `assets/animations/${safe} ${i}.anim`;
+  await writeText(rel, JSON.stringify(newClip(), null, 1));
+  await refreshTree();
+  if (def && !def.animator) { snapshot(); def.animator = { clip: rel, autoplay: true }; saveScene(); renderInsp(); }
+  await openAnim(rel);
+  status(`Clip créé : ${rel}. Place le curseur, déplace l'objet, puis « Image clé » (K).`);
+  return rel;
+}
+async function addAnimTo(o) {
+  select(o.id);
+  const clips = clipFiles();
+  if (!clips.length) return newAnimClip();
+  snapshot(); o.animator = { clip: clips[0], autoplay: true }; saveScene(); renderInsp();
+  openAnim(clips[0]);
+}
+
 // ---------------- Sculpture du terrain ----------------
 function setSculpt(tool, render = true) {
   S.sculpt.tool = tool || null;
@@ -1531,6 +1723,7 @@ function playSpec(scene = S.scene) {
 }
 async function play(debug = false) {
   if (S.mode !== 'edit') return stop();
+  if (anim) { anim.stop(); anim.restore(); }
   DBG.on = !!debug; DBG.hits.clear(); DBG.stepping = false;
   if (debug) { syncBreakpoints(); startDebugTimer(); }
   try {
@@ -1681,6 +1874,7 @@ const MENUS = {
   window: () => [
     { label: 'Scène', ic: S.type === '3d' ? 'box' : 'image', key: 'Ctrl+1', fn: () => activateTab('scene') },
     { label: 'Jeu', ic: 'gamepad', key: 'Ctrl+2', fn: () => activateTab('game') },
+    { label: 'Interface', ic: 'app', key: 'Ctrl+3', fn: () => activateTab('ui') },
     { label: 'Projet', ic: 'folder', key: 'Ctrl+5', fn: () => showBottom('project') },
     { label: 'Console', ic: 'terminal', key: 'Ctrl+Maj+C', fn: () => showBottom('console') },
     '-',
@@ -1737,13 +1931,15 @@ window.addEventListener('keydown', e => {
   if (ctrl && k === 'p') { e.preventDefault(); if (e.altKey) stepFrame(); else if (e.shiftKey) pause(); else play(); return; }
   if (ctrl && k === '1') { e.preventDefault(); activateTab('scene'); return; }
   if (ctrl && k === '2') { e.preventDefault(); activateTab('game'); return; }
+  if (ctrl && k === '3') { e.preventDefault(); activateTab('ui'); return; }
   if (ctrl && e.shiftKey && k === 'c') { e.preventDefault(); showBottom('console'); return; }
   if (ctrl && e.shiftKey && k === 'n' && S.type === '3d') { e.preventDefault(); createObject('empty'); return; }
-  if (ctrl && (k === 'w' || e.key === 'F4') && !['scene', 'game'].includes(S.active)) { e.preventDefault(); closeTab(S.active); return; }
+  if (ctrl && (k === 'w' || e.key === 'F4') && !FIXED_TABS.includes(S.active)) { e.preventDefault(); closeTab(S.active); return; }
   if (typing(e)) return;
   if (ctrl && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if (ctrl && k === 'y') { e.preventDefault(); redo(); return; }
   if (ctrl && k === 'd') { e.preventDefault(); duplicateSel(); return; }
+  if (k === 'k' && !ctrl && !e.altKey && anim && !$('#animView').hidden) { e.preventDefault(); anim.addKey(); return; }
   if (e.key === 'Delete') { e.preventDefault(); deleteSel(); return; }
   if (e.key === 'F2') { e.preventDefault(); renameSel(); return; }
   if (e.key === 'Escape') { closeMenu(); return; }
@@ -1809,7 +2005,7 @@ const BLOCKS_3D = [
   'set color to [#ff6680]', 'set opacity to (50) %', 'set texture to [assets/texture.png]', 'show object [myself]', 'hide object [myself]', 'play animation [Walk]', 'play animation [Jump] once', 'stop animations', '(animations of this object)',
   'create [cube v] named [Caisse] at x: (0) y: (3) z: (0)', 'create model [assets/modele.glb] named [Modèle] at x: (0) y: (0) z: (0)', 'clone object [myself] as [Copie]', 'delete object [Copie]', '<object [Copie] exists?>', '(name of this object)',
   'turn physics [on v]', 'set velocity to x: (0) y: (0) z: (0)', 'change velocity by x: (0) y: (5) z: (0)', 'jump with force (6)', 'set world gravity to (9.81)', '<on ground?>', '<touching object [anything]?>', 'when this object touches [Joueur]', '([y v] velocity)',
-  'camera follow [myself] distance (7) height (3)', 'first person camera on [myself] eye height (1.6)', 'set camera position to x: (0) y: (4) z: (9)', 'point camera at x: (0) y: (0) z: (0)', 'set camera field of view to (60)', 'stop camera follow', 'start particles [Feu]', 'stop particles [Feu]', 'burst (30) particles from [Feu]', 'set particle rate of [Feu] to (50)', 'create effect [explosion v] named [Boum] at x: (0) y: (1) z: (0)', '(terrain height at x: (0) z: (0))',
+  'camera follow [myself] distance (7) height (3)', 'first person camera on [myself] eye height (1.6)', 'set camera position to x: (0) y: (4) z: (9)', 'point camera at x: (0) y: (0) z: (0)', 'set camera field of view to (60)', 'stop camera follow', 'start particles [Feu]', 'stop particles [Feu]', 'burst (30) particles from [Feu]', 'set particle rate of [Feu] to (50)', 'create effect [explosion v] named [Boum] at x: (0) y: (1) z: (0)', '(terrain height at x: (0) z: (0))', 'set bar [Vie] to (50) %', 'set image of [Icone] to [assets/image.png]', 'show element [Menu]', 'hide element [Menu]', 'play clip [Porte]', 'play clip [Porte] once', 'stop clip', '<clip playing?>',
   '(axis [horizontal v])', '(axis [vertical v])', '(mouse movement [x v])', 'lock mouse pointer', 'unlock mouse pointer', 'when this object clicked', '(object under mouse)',
   'set sky colors top [#5d9fe8] bottom [#dcecfb]', 'set fog from (20) to (90)', 'remove fog', 'set sun brightness to (1.6)', 'set ambient light to (0.5)', 'show message [Bienvenue !]', 'hide message',
   'play sound file [assets/son.mp3]', 'stop sound files', '(delta time)', 'print [Bonjour]'
@@ -1832,7 +2028,7 @@ function setupMonaco() {
         [/^\s*return\b/, 'hat'],
         [/^\s*import\b.*$/, 'hat'],
         [/\b(forever|repeat until|repeat|if|then|else|end|wait until|wait|stop|create clone of|delete this clone|broadcast and wait|broadcast)\b/, 'control'],
-        [/\b(set position|change position|move forward|move sideways|rotate by|set rotation|look at|set scale|set color|set opacity|set texture|show object|hide object|play animation|stop animations|create|clone object|delete object|turn physics|set velocity|change velocity|jump with force|set world gravity|camera follow|first person camera|start particles|stop particles|burst|set particle rate|create effect|terrain height at|set camera|point camera|stop camera follow|lock mouse pointer|unlock mouse pointer|set sky colors|set fog|remove fog|set sun brightness|set ambient light|show message|hide message|play sound file|stop sound files|print|add title|add label|add button|add text field|add image|set text of|remove element|clear interface|arrange elements|set app background|show notification)\b/, 'engine'],
+        [/\b(set position|change position|move forward|move sideways|rotate by|set rotation|look at|set scale|set color|set opacity|set texture|show object|hide object|play animation|stop animations|create|clone object|delete object|turn physics|set velocity|change velocity|jump with force|set world gravity|camera follow|first person camera|start particles|set bar|set image of|show element|hide element|play clip|stop clip|stop particles|burst|set particle rate|create effect|terrain height at|set camera|point camera|stop camera follow|lock mouse pointer|unlock mouse pointer|set sky colors|set fog|remove fog|set sun brightness|set ambient light|show message|hide message|play sound file|stop sound files|print|add title|add label|add button|add text field|add image|set text of|remove element|clear interface|arrange elements|set app background|show notification)\b/, 'engine'],
         [/\b(set|change|go to|glide|move|turn|point in direction|point towards|say|think|show|hide|switch costume to|next costume|play sound|start sound|add|delete|insert|replace)\b/, 'action'],
         [/\[[^\]]*\]/, 'string'],
         [/\(\s*-?\d+(\.\d+)?\s*\)/, 'number'],
@@ -1912,6 +2108,8 @@ function setupMonaco() {
       : 'Glisse un lutin pour le placer  ·  Flèches : déplacer d\'un pixel  ·  Ctrl : aimanter à 10';
     renderTabs(); activateTab('scene');
     renderFolders(); renderAssets(); showBottom('project');
+    initUiEditor();
+    initAnimEditor();
     await loadScene();
     log('log', `Projet ouvert : ${DIR}`);
     setupMonaco();

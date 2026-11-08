@@ -285,3 +285,42 @@ body.engine-used .un-game-idle { display: none; }
 .in-tools .un-btn { justify-content: center; padding-left: 4px; padding-right: 4px; }
 .in-tools .un-btn.on { background: var(--accent, #3d7bd9); border-color: var(--accent, #3d7bd9); color: #fff; }
 .un-row .oi.k-terrain { color: #7cc36a; } .un-row .oi.k-particles { color: #ff9f4a; }
+
+/* Éditeur d'interface */
+.ui-wrap { flex: 1; min-height: 0; display: flex; }
+.ui-list { width: 170px; flex: none; overflow: auto; border-right: 1px solid var(--line, #393b40); padding: 6px; font-size: 12.5px; }
+.ui-row { display: flex; gap: 8px; align-items: center; padding: 4px 6px; border-radius: 4px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ui-row span { flex: none; width: 16px; height: 16px; border-radius: 3px; background: #3a3d45; color: #cfd2d8; font: 700 10px/16px system-ui; text-align: center; }
+.ui-row:hover { background: rgba(255,255,255,.05); } .ui-row.sel { background: var(--accent, #3d7bd9); color: #fff; } .ui-row.off { opacity: .5; }
+.ui-none { color: var(--dim, #9a9da6); padding: 6px; margin: 0; }
+.ui-box { flex: 1; min-width: 0; position: relative; display: flex; align-items: center; justify-content: center; background: #1b1c1f; overflow: hidden; }
+.ui-stage { position: relative; overflow: hidden; box-shadow: 0 0 0 1px #45484f, 0 8px 30px rgba(0,0,0,.4); user-select: none; }
+.ui-stage .mxui { pointer-events: auto; }
+.ui-sel { position: absolute; outline: 2px solid #ffa733; pointer-events: none; }
+.ui-sel i { position: absolute; width: 10px; height: 10px; background: #ffa733; border: 1px solid #1b1c1f; pointer-events: auto; }
+.ui-sel i[data-h=nw] { left: -6px; top: -6px; cursor: nwse-resize; } .ui-sel i[data-h=se] { right: -6px; bottom: -6px; cursor: nwse-resize; }
+.ui-sel i[data-h=ne] { right: -6px; top: -6px; cursor: nesw-resize; } .ui-sel i[data-h=sw] { left: -6px; bottom: -6px; cursor: nesw-resize; }
+.ui-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 30px; text-align: center; color: rgba(255,255,255,.75); font-size: 14px; background: rgba(0,0,0,.25); }
+body.un textarea.f { width: 100%; resize: vertical; min-height: 44px; padding: 4px 6px; border-radius: 4px; background: #1c1d20; border: 1px solid var(--line-2); color: var(--text); font: inherit; outline: 0; box-sizing: border-box; }
+body.un textarea.f:focus { border-color: var(--accent); }
+
+/* Éditeur d'animation */
+.un-anim { height: 100%; overflow: auto; padding: 6px 12px 10px; font-size: 12.5px; }
+.un-anim[hidden] { display: none; }
+#animTools select.f { width: 150px; height: 24px; }
+.an-empty { padding: 18px 6px; color: var(--dim, #9a9da6); max-width: 760px; line-height: 1.5; }
+.an-empty b { color: var(--text, #dfe1e5); }
+.an-head { display: flex; align-items: center; gap: 14px; padding: 2px 0 8px; flex-wrap: wrap; }
+.an-head label { display: inline-flex; align-items: center; gap: 6px; }
+.an-head input.f { height: 22px; }
+.an-time { font: 600 12px "JetBrains Mono", Consolas, monospace; color: #ffcf3a; min-width: 60px; text-align: right; }
+.an-grid { position: relative; user-select: none; }
+.an-row { display: flex; height: 22px; align-items: stretch; }
+.an-lbl { width: 130px; flex: none; display: flex; align-items: center; color: var(--dim, #9a9da6); font-size: 12px; }
+.an-lane, .an-ruler { flex: 1; position: relative; border-bottom: 1px solid rgba(255,255,255,.05); cursor: col-resize; margin-right: 10px; }
+.an-ruler { border-bottom: 1px solid var(--line, #393b40); }
+.an-ruler span { position: absolute; top: 3px; transform: translateX(-50%); font-size: 10.5px; color: var(--dim, #9a9da6); white-space: nowrap; pointer-events: none; }
+.an-ruler span::after { content: ''; position: absolute; left: 50%; top: 14px; height: 5px; border-left: 1px solid var(--dim, #9a9da6); }
+.an-key { position: absolute; top: 50%; width: 9px; height: 9px; margin: -5px 0 0 -5px; background: #c9ccd4; transform: rotate(45deg); cursor: ew-resize; border: 1px solid #1b1c1f; }
+.an-key.sel { background: #ffcf3a; }
+.an-cursor { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #ffcf3a; pointer-events: none; }
