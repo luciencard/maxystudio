@@ -190,6 +190,8 @@ Pour partager le projet, utilise Fichier > Exporter : tout le dossier devient un
 - Blocs C (\`forever\`, \`repeat\`, \`if\`, \`repeat until\`, \`if/else\`) : indenter de 4 espaces et fermer avec \`end\`.
 - Variables créées automatiquement par \`set [nom v] to (..)\`. Une variable créée dans le script du monde est partagée par tous les objets.
 - Blocs personnalisés : \`define sauter (hauteur)\` puis \`sauter (10)\`. \`define!\` = sans rafraîchissement d'écran.
+- Fonctions qui renvoient une valeur (MaxyCode) : dans un \`define\`, \`return (valeur)\` renvoie un résultat. On appelle la fonction dans une expression : \`set [aire v] to (carre (5))\`, \`say (salut [Maxy])\`, \`if <(fib (6)) = (8)> then\`. La récursion marche (une fonction peut s'appeler elle-même). Une fonction qui renvoie une valeur s'exécute d'un coup : pas de \`wait\` dedans, et pas d'appel dans \`repeat until\` ou \`wait until\` (range d'abord le résultat dans une variable). Une fonction n'existe que dans le script où elle est définie.
+  Exemple : \`define carre (n)\` puis, à la ligne suivante, \`return ((n) * (n))\`.
 - Commentaires : \`// comme ceci\`
 ${type === '3d' ? BLOCKS_3D : type === 'app' ? BLOCKS_UI : ''}
 ## Exemple
