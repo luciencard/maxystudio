@@ -40,11 +40,10 @@ const scene = (type, body) => json(Object.assign({ format: 'scratchcode-scene', 
 
 // ---------- Modèles 2D ----------
 const T2D = {
+  // Vide : une scène blanche, sans lutin ni code. Les autres modèles sont des exemples.
   vide: () => ({
-    'assets/Lutin.svg': SVG.lutin, 'assets/Fond.svg': SVG.fondJour,
-    'scripts/Scène.sc': 'when app run\nset [score v] to (0)\n',
-    'scripts/Lutin.sc': 'when app run\ngo to x: (0) y: (0)\nsay [Bonjour !] for (2) seconds\nforever\n    if <key (right arrow v) pressed?> then\n        change x by (6)\n    end\n    if <key (left arrow v) pressed?> then\n        change x by (-6)\n    end\nend\n',
-    'scenes/Main.scene': scene('2d', { stage: { backdrops: ['assets/Fond.svg'], script: 'scripts/Scène.sc' }, objects: [sprite('Lutin', { costumes: ['assets/Lutin.svg'] })] })
+    'assets/Fond.svg': SVG.fondBlanc,
+    'scenes/Main.scene': scene('2d', { stage: { backdrops: ['assets/Fond.svg'], script: '' }, objects: [] })
   }),
   plateforme: () => ({
     'assets/Joueur.svg': SVG.joueur, 'assets/Fond.svg': SVG.fondJour,
@@ -67,15 +66,13 @@ const T2D = {
 // ---------- Modèles 3D ----------
 const camera = (pos, rot) => obj('camera', 'Main Camera', { position: pos, rotation: rot });
 const T3D = {
+  // Vide : une caméra et un sol, sans code. Les autres modèles sont des exemples.
   vide: () => ({
-    'scripts/Monde.sc': 'when app run\nprint [La scène démarre.]\n',
-    'scripts/Cube.sc': 'when app run\nforever\n    rotate by x: (0) y: (2) z: (0) degrees\nend\n\nwhen this object clicked\nset color to [#ff6680]\n',
     'scenes/Main.scene': scene('3d', {
-      environment: env(), worldScript: 'scripts/Monde.sc',
+      environment: env(), worldScript: '',
       objects: [
         camera([0, 3, 8], [-15, 0, 0]),
-        obj('plane', 'Sol', { scale: [20, 1, 20], mesh: { color: '#7cc26b' } }),
-        obj('cube', 'Cube', { position: [0, 0.75, 0], script: 'scripts/Cube.sc', mesh: { color: '#855cd6' } })
+        obj('plane', 'Sol', { scale: [20, 1, 20], mesh: { color: '#9aa3b5' } })
       ]
     })
   }),
@@ -120,10 +117,10 @@ const T3D = {
 
 // ---------- Modèles Application ----------
 const TAPP = {
+  // Vide : un fond blanc, sans code. Le modèle Quiz est un exemple.
   vide: () => ({
-    'scripts/App.sc': 'when app run\nset app background to [#f4f1ff]\nadd title [titre] text [Mon application]\nadd label [info] text [Écris ton prénom puis clique sur le bouton.]\nadd text field [nom] hint [Ton prénom]\nadd button [ok] text [Dire bonjour]\n\nwhen button [ok] clicked\nset text of [info] to (join [Bonjour ] (join (text of [nom]) [ !]))\n',
     'assets/Fond.svg': SVG.fondBlanc,
-    'scenes/Main.scene': scene('app', { stage: { backdrops: ['assets/Fond.svg'], script: 'scripts/App.sc' }, objects: [] })
+    'scenes/Main.scene': scene('app', { stage: { backdrops: ['assets/Fond.svg'], script: '' }, objects: [] })
   }),
   quiz: () => ({
     'scripts/App.sc': 'when app run\nset [score v] to (0)\nset app background to [#eef7ff]\nadd title [titre] text [Quiz des capitales]\nadd label [question] text [Quelle est la capitale du Japon ?]\nadd button [r1] text [Kyoto]\nadd button [r2] text [Tokyo]\nadd button [r3] text [Osaka]\nadd label [résultat] text [ ]\n\nwhen button [r2] clicked\nchange [score v] by (1)\nset text of [résultat] to [Bonne réponse !]\nshow notification (join [Score : ] (score))\n\nwhen button [r1] clicked\nset text of [résultat] to [Non, essaie encore.]\n\nwhen button [r3] clicked\nset text of [résultat] to [Non, essaie encore.]\n',

@@ -238,3 +238,12 @@ body.un input[type="range"] { width: 100%; accent-color: var(--accent); }
 .pl-h { margin: 4px 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted, #9aa0aa); }
 .pl-problems { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; line-height: 1.5; max-height: 40vh; overflow: auto; }
 .pl-reload { margin-top: 8px; }
+
+/* Vue Jeu avant la première partie : écran MaxyStudio à la place du projet de départ du moteur */
+.un-game { position: relative; }
+.un-game-idle { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  background: #16182a; background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 28px 28px; color: #fff; text-align: center; padding: 20px; }
+.un-game-idle b { font-size: 17px; }
+.un-game-idle span { color: #b9bdd0; font-size: 13px; margin-bottom: 6px; }
+body.engine-used .un-game-idle { display: none; }

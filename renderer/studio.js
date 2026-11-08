@@ -1096,6 +1096,7 @@ async function play() {
     updateInspection();
     if (errors) log('warn', `${errors} erreur${errors > 1 ? 's' : ''} : les scripts concernés ne sont pas chargés.`);
     else log('ok', 'Compilation réussie, aucune erreur.');
+    document.body.classList.add('engine-used');
     setMode('play');
     activateTab('game');
     vm.greenFlag();
@@ -1147,6 +1148,7 @@ function setMode(m) {
   status(m === 'play' ? (S.paused ? 'En pause' : 'En cours d\'exécution') : 'Prêt');
 }
 $('#playBtn').onclick = play;
+$('#idlePlay').onclick = play;
 $('#pauseBtn').onclick = pause;
 $('#stepBtn').onclick = stepFrame;
 $('#maxBtn').onclick = e => { e.currentTarget.classList.toggle('on'); setMode(S.mode); };

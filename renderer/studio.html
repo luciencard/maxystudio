@@ -77,6 +77,13 @@
             <div class="un-game">
               <div class="un-loading" id="engineLoading">Chargement du moteur…</div>
               <iframe id="engine" src="/index.html?studio=1" title="Jeu"></iframe>
+              <!-- Avant la première partie, le moteur montre son projet de départ : on le cache derrière cet écran. -->
+              <div class="un-game-idle" id="gameIdle">
+                <img src="logo.svg" width="64" height="64" alt="">
+                <b>Ton jeu s'affichera ici</b>
+                <span>Appuie sur Lecture (Ctrl+P) pour le lancer.</span>
+                <button class="un-btn primary" id="idlePlay">Lancer le jeu</button>
+              </div>
             </div>
           </div>
           <div class="un-view" id="codeView" hidden><div id="monaco"></div><div class="un-insp-badge" id="inspection"></div></div>
