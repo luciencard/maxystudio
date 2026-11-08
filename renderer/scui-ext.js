@@ -75,7 +75,9 @@
           cmd('alert', 'show notification [TEXT]', { TEXT: S('Enregistré') }),
           // Scènes (tous les types de projets) : changer de niveau en gardant les variables de la Scène
           cmd('goToScene', 'go to scene [NAME]', { NAME: S('Niveau 2') }),
-          { opcode: 'sceneName', blockType: Scratch.BlockType.REPORTER, text: 'scene name', disableMonitor: true }
+          { opcode: 'sceneName', blockType: Scratch.BlockType.REPORTER, text: 'scene name', disableMonitor: true },
+          // Débogueur de MaxyStudio : point de contrôle ajouté automatiquement avant chaque ligne en mode débogage
+          cmd('debugLine', 'debug line [ID]', { ID: S('') })
         ],
         menus: {
           props: { acceptReporters: false, items: ['color', 'background', 'text size', 'width', 'visible'] },
@@ -91,6 +93,7 @@
       if (util && util.thread) util.thread.status = 4; // arrête ce script : la nouvelle scène prend la suite
     }
     sceneName() { return window.__maxySceneName || ''; }
+    debugLine(args, util) { const f = window.__maxyDebug; return typeof f === 'function' ? f(String(args.ID), util) : undefined; }
     addTitle(a) { const el = document.createElement('div'); el.className = 'scui-label scui-title'; el.textContent = Cast.toString(a.TEXT); put(a.ID, el); }
     addLabel(a) { const el = document.createElement('div'); el.className = 'scui-label'; el.textContent = Cast.toString(a.TEXT); put(a.ID, el); }
     addButton(a) {

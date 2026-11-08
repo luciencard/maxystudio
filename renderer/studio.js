@@ -948,6 +948,7 @@ function activateTab(t) {
   $('#codeView').hidden = t === 'scene' || t === 'game';
   if (t !== 'scene' && t !== 'game' && editor) {
     editor.setModel(S.models.get(t));
+    renderBreakpoints(t);
     updateInspection();
     $('#statusCursor').textContent = '';
   }
@@ -991,11 +992,14 @@ function showBottom(tab) {
   $('#projectView').hidden = tab !== 'project';
   $('#consoleView').hidden = tab !== 'console';
   $('#libraryView').hidden = tab !== 'library';
+  $('#debugView').hidden = tab !== 'debug';
+  $('#debugTools').hidden = tab !== 'debug';
   $('#projTools').hidden = tab !== 'project';
   $('#consoleTools').hidden = tab !== 'console';
   $('#libTools').hidden = tab !== 'library';
   if (tab === 'console') renderConsole();
   if (tab === 'library') openLibrary();
+  if (tab === 'debug') renderDebug();
 }
 
 // ---------------- Bibliothèque d'assets (packs Kenney, CC0) ----------------
@@ -1069,7 +1073,7 @@ document.querySelectorAll('[data-btab]').forEach(b => b.onclick = () => showBott
 
 
 // ---------------- Lancer une scène (Lecture, ou changement de niveau en jeu) ----------------
-async function runScene(sc, scene, vars, name) {
+async function runScene(sc, scene, vars, name, debug = DBG.on) {
   sc.vm.stopAll();
   const b64 = await studio.playArchive(DIR, playSpec(scene));
   const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
@@ -1080,6 +1084,7 @@ async function runScene(sc, scene, vars, name) {
   frame.contentWindow.__scProject = { type: S.type, scene: JSON.parse(JSON.stringify(scene)), base: S.base };
   frame.contentWindow.__maxySceneName = name;
   frame.contentWindow.__maxyGoToScene = goToScene;
+  frame.contentWindow.__maxyDebug = debug ? debugHook : null;
   frame.contentWindow.__scPaused = false;
   for (const el of frame.contentDocument.querySelectorAll('html, body, .gui, .stage-pane, .stage-wrap')) { el.scrollTop = 0; el.scrollLeft = 0; }
   const vm = sc.vm;
@@ -1098,7 +1103,7 @@ async function runScene(sc, scene, vars, name) {
       }
     };
     await load(src);
-    const mc = compileMaxyCode(src, { resolve: name => mods[name] ?? null });
+    const mc = compileMaxyCode(src, { resolve: name => mods[name] ?? null, debug: debug && rel ? rel : null });
     const list = (await sc.setCode(target, mc.code)) || [];
     const errs = [...mc.errors, ...list.map(e => {
       const raw = Number(e.line ?? e.lineNumber ?? (e.from && e.from.line) ?? 1) || 1;
@@ -1270,6 +1275,123 @@ function detachPrefab(id) {
   snapshot(); delete o.prefab; saveScene(); renderInsp(); renderHier();
 }
 
+
+// ---------------- Débogueur : points d'arrêt, pas à pas, variables, profileur ----------------
+const DBG = { on: false, bps: new Map(), decos: new Map(), stepping: false, pausedAt: null, resume: null, hits: new Map(), pauseDeco: [], timer: null, frames: 0, fps: 0, lastHits: 0, lps: 0 };
+const countBreakpoints = () => [...DBG.bps.values()].reduce((a, set) => a + set.size, 0);
+function toggleBreakpoint(rel, line) {
+  const set = DBG.bps.get(rel) || new Set();
+  if (set.has(line)) set.delete(line); else set.add(line);
+  DBG.bps.set(rel, set);
+  renderBreakpoints(rel);
+  status(`${countBreakpoints()} point${countBreakpoints() > 1 ? 's' : ''} d'arrêt`);
+}
+function renderBreakpoints(rel) {
+  const m = S.models.get(rel); if (!m || !rel.endsWith('.sc')) return;
+  const lines = [...(DBG.bps.get(rel) || [])].filter(l => l <= m.getLineCount());
+  DBG.decos.set(rel, m.deltaDecorations(DBG.decos.get(rel) || [], lines.map(l => ({ range: new monaco.Range(l, 1, l, 1), options: { isWholeLine: true, glyphMarginClassName: 'maxy-bp', glyphMarginHoverMessage: { value: "Point d'arrêt : clique pour le retirer" }, stickiness: 1 } }))));
+}
+/** Les lignes bougent quand on écrit : on relit la position des points d'arrêt avant de lancer. */
+function syncBreakpoints() {
+  for (const [rel, ids] of DBG.decos) {
+    const m = S.models.get(rel); if (!m) continue;
+    DBG.bps.set(rel, new Set(ids.map(id => m.getDecorationRange(id)).filter(Boolean).map(r => r.startLineNumber)));
+  }
+}
+/** Appelé par le bloc « debug line [script:ligne] » avant chaque instruction, en mode débogage. */
+function debugHook(id, util) {
+  DBG.hits.set(id, (DBG.hits.get(id) || 0) + 1);
+  if (!DBG.on || DBG.resume) return;
+  const k = id.lastIndexOf(':'), rel = id.slice(0, k), line = +id.slice(k + 1);
+  if (!DBG.stepping && !(DBG.bps.get(rel) && DBG.bps.get(rel).has(line))) return;
+  return new Promise(res => debugPause(rel, line, util && util.target ? util.target.getName() : '', res));
+}
+async function debugPause(rel, line, who, resume) {
+  DBG.stepping = false;
+  DBG.pausedAt = { rel, line, who: who === 'Stage' ? 'Scène' : who };
+  DBG.resume = resume;
+  const sc = engine();
+  if (sc) sc.vm.runtime.quit();
+  if (frame.contentWindow) frame.contentWindow.__scPaused = true;
+  S.paused = true; setMode('play');
+  await openScript(rel, line);
+  const m = S.models.get(rel);
+  if (m) DBG.pauseDeco = m.deltaDecorations(DBG.pauseDeco, [{ range: new monaco.Range(line, 1, line, 1), options: { isWholeLine: true, className: 'maxy-paused-line', glyphMarginClassName: 'maxy-paused-glyph' } }]);
+  showBottom('debug');
+  log('warn', `En pause : ${rel}, ligne ${line} (${DBG.pausedAt.who})`, { loc: { rel, line } });
+}
+function endDebugPause() {
+  if (DBG.pausedAt) { const m = S.models.get(DBG.pausedAt.rel); if (m) DBG.pauseDeco = m.deltaDecorations(DBG.pauseDeco, []); }
+  DBG.pausedAt = null; DBG.resume = null;
+}
+/** Continuer (F8) ou passer à la ligne suivante (F10). */
+function debugContinue(step) {
+  if (!DBG.resume) return;
+  const r = DBG.resume;
+  endDebugPause();
+  DBG.stepping = !!step;
+  S.paused = false;
+  if (frame.contentWindow) frame.contentWindow.__scPaused = false;
+  const sc = engine(); if (sc) sc.vm.runtime.start();
+  setMode('play');
+  r();
+  if (!step) activateTab('game');
+  renderDebug();
+}
+function startDebugTimer() {
+  clearInterval(DBG.timer);
+  let last = performance.now(), frames = 0;
+  const sc = engine();
+  // Images par seconde du moteur : on compte les pas du moteur Scratch
+  if (sc && !sc.vm.runtime.__maxyCount) {
+    const step = sc.vm.runtime._step;
+    sc.vm.runtime._step = function () { DBG.frames++; return step.call(this); };
+    sc.vm.runtime.__maxyCount = true;
+  }
+  DBG.timer = setInterval(() => {
+    const now = performance.now(), dt = (now - last) / 1000;
+    const total = [...DBG.hits.values()].reduce((a, b) => a + b, 0);
+    DBG.fps = Math.round(DBG.frames / dt); DBG.lps = Math.round((total - DBG.lastHits) / dt);
+    DBG.frames = 0; DBG.lastHits = total; last = now;
+    if (!DBG.on && S.mode === 'edit') { clearInterval(DBG.timer); DBG.timer = null; }
+    if (!$('#debugView').hidden) renderDebug();
+  }, 500);
+}
+const fmtVal = v => Array.isArray(v) ? `[${v.slice(0, 8).map(x => String(x)).join(', ')}${v.length > 8 ? '…' : ''}] (${v.length})` : String(v);
+function renderDebug() {
+  const box = $('#debugView');
+  const sc = engine();
+  const paused = DBG.pausedAt;
+  $('#dbgContinue').disabled = !paused; $('#dbgStep').disabled = !paused; $('#dbgStop').disabled = S.mode === 'edit';
+  let head;
+  if (S.mode === 'edit') head = `<b>Le jeu est arrêté.</b> Clique dans la marge d'un script (à gauche des numéros de ligne) pour poser un point d'arrêt, puis lance avec ${icon('bug', 12)} Déboguer (F5).`;
+  else if (!DBG.on) head = '<b>Le jeu tourne sans le mode débogage.</b> Arrête-le et relance avec Déboguer (F5) pour utiliser les points d\'arrêt.';
+  else if (paused) head = `<b class="dbg-paused">En pause</b> : ${esc(paused.rel)}, ligne ${paused.line} · objet <b>${esc(paused.who)}</b>. F8 continuer, F10 ligne suivante.`;
+  else head = `<b class="dbg-run">En cours</b> · ${DBG.fps} images/s · ${DBG.lps} lignes/s · ${countBreakpoints()} point${countBreakpoints() > 1 ? 's' : ''} d'arrêt`;
+  let vars = '', prof = '';
+  if (sc && S.mode !== 'edit') {
+    const targets = sc.vm.runtime.targets.filter(t => t.isOriginal);
+    vars = targets.map(t => {
+      const vs = Object.values(t.variables).filter(v => (v.type === '' || v.type === 'list') && !v.name.startsWith('_'));
+      if (!vs.length) return '';
+      return `<div class="dbg-target"><b>${esc(t.isStage ? 'Scène' : t.getName())}</b>${vs.map(v => `<div class="dbg-var" data-t="${esc(t.id)}" data-v="${esc(v.id)}" title="Double-clique pour changer la valeur"><span>${esc(v.name)}${v.type === 'list' ? ' (liste)' : ''}</span><code>${esc(fmtVal(v.value))}</code></div>`).join('')}</div>`;
+    }).join('') || '<p class="un-dim">Aucune variable pour l\'instant.</p>';
+    const top = [...DBG.hits.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+    prof = top.length ? top.map(([id, n]) => { const k = id.lastIndexOf(':'); return `<div class="dbg-line" data-rel="${esc(id.slice(0, k))}" data-line="${id.slice(k + 1)}"><span>${esc(id.slice(0, k))}, ligne ${id.slice(k + 1)}</span><code>${n.toLocaleString('fr-FR')}</code></div>`; }).join('') : '<p class="un-dim">Lance en mode débogage pour voir les lignes les plus exécutées.</p>';
+  }
+  box.innerHTML = `<div class="dbg-head">${head}</div><div class="dbg-cols"><section><h4>Variables</h4>${vars || '<p class="un-dim">Les variables s\'affichent pendant le jeu.</p>'}</section><section><h4>Profileur : lignes les plus exécutées</h4>${prof || '<p class="un-dim">Rien à afficher.</p>'}</section></div>`;
+  box.querySelectorAll('.dbg-var').forEach(el => el.ondblclick = async () => {
+    const t = sc.vm.runtime.getTargetById(el.dataset.t); const v = t && t.variables[el.dataset.v];
+    if (!v || v.type === 'list') return;
+    const nv = await ask(`Nouvelle valeur de « ${v.name} »`, String(v.value));
+    if (nv != null) { v.value = nv; renderDebug(); }
+  });
+  box.querySelectorAll('.dbg-line').forEach(el => el.onclick = () => openScript(el.dataset.rel, +el.dataset.line));
+}
+$('#dbgContinue').onclick = () => debugContinue(false);
+$('#dbgStep').onclick = () => debugContinue(true);
+$('#dbgStop').onclick = () => stop();
+
 // ---------------- Moteur de jeu (onglet Jeu) ----------------
 const frame = $('#engine');
 const ENGINE_CSS = `
@@ -1339,8 +1461,10 @@ function playSpec(scene = S.scene) {
   const backdrops = S.type === '3d' ? [] : (scene.stage.backdrops || []).map(rel => ({ rel, name: stem(rel) }));
   return { stage: { costumes: backdrops }, sprites };
 }
-async function play() {
+async function play(debug = false) {
   if (S.mode !== 'edit') return stop();
+  DBG.on = !!debug; DBG.hits.clear(); DBG.stepping = false;
+  if (debug) { syncBreakpoints(); startDebugTimer(); }
   try {
     await saveAll();
     if (S.clearOnPlay) clearLogs();
@@ -1351,6 +1475,7 @@ async function play() {
     document.body.classList.add('engine-used');
     setMode('play');
     activateTab('game');
+    if (debug) { log('log', `Mode débogage : ${countBreakpoints()} point${countBreakpoints() > 1 ? 's' : ''} d'arrêt. F8 continuer, F10 ligne suivante.`); showBottom('debug'); }
     if (plugins) plugins.emit('play');
   } catch (e) {
     log('error', 'Lancement impossible : ' + cleanErr(e));
@@ -1359,6 +1484,8 @@ async function play() {
   }
 }
 function stop() {
+  endDebugPause();
+  DBG.on = false;
   const sc = engine();
   if (sc) {
     if (S.paused) sc.vm.runtime.start();
@@ -1397,8 +1524,9 @@ function setMode(m) {
   $('#pauseBtn').classList.toggle('on', S.paused);
   status(m === 'play' ? (S.paused ? 'En pause' : 'En cours d\'exécution') : 'Prêt');
 }
-$('#playBtn').onclick = play;
-$('#idlePlay').onclick = play;
+$('#playBtn').onclick = () => play(false);
+$('#debugBtn').onclick = () => (S.mode === 'edit' ? play(true) : stop());
+$('#idlePlay').onclick = () => play(false);
 $('#pauseBtn').onclick = pause;
 $('#stepBtn').onclick = stepFrame;
 $('#maxBtn').onclick = e => { e.currentTarget.classList.toggle('on'); setMode(S.mode); };
@@ -1527,6 +1655,12 @@ $('#projBtn').onclick = async e => {
 
 // ---------------- Raccourcis clavier ----------------
 const typing = e => { const t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable || (t.closest && t.closest('#monaco'))); };
+window.addEventListener('keydown', e => {
+  if ($('#modalBack').classList.contains('show')) return;
+  if (e.key === 'F5' && !e.ctrlKey) { e.preventDefault(); e.stopPropagation(); if (S.mode === 'edit') play(true); return; }
+  if (e.key === 'F8' && DBG.resume) { e.preventDefault(); e.stopPropagation(); debugContinue(false); return; }
+  if (e.key === 'F10' && DBG.resume) { e.preventDefault(); e.stopPropagation(); debugContinue(true); return; }
+}, true);
 window.addEventListener('keydown', e => {
   if ($('#modalBack').classList.contains('show')) return;
   const k = e.key.toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
@@ -1660,7 +1794,12 @@ function setupMonaco() {
     } });
     editor = monaco.editor.create($('#monaco'), {
       theme: 'sc-dark', automaticLayout: true, fontFamily: '"JetBrains Mono", Consolas, monospace', fontSize: 14, lineHeight: 22, fontLigatures: true,
-      tabSize: 4, insertSpaces: true, minimap: { enabled: false }, smoothScrolling: true, scrollBeyondLastLine: false, renderLineHighlight: 'all', model: null
+      tabSize: 4, insertSpaces: true, minimap: { enabled: false }, smoothScrolling: true, scrollBeyondLastLine: false, renderLineHighlight: 'all', model: null, glyphMargin: true
+    });
+    // Clic dans la marge : point d'arrêt (scripts .sc)
+    editor.onMouseDown(e => {
+      const T = monaco.editor.MouseTargetType;
+      if ((e.target.type === T.GUTTER_GLYPH_MARGIN || e.target.type === T.GUTTER_LINE_DECORATIONS) && e.target.position && S.active && S.active.endsWith('.sc')) toggleBreakpoint(S.active, e.target.position.lineNumber);
     });
     document.fonts.load('14px "JetBrains Mono"').then(() => monaco.editor.remeasureFonts());
     editor.onDidChangeCursorPosition(e => { $('#statusCursor').textContent = `Ligne ${e.position.lineNumber}, colonne ${e.position.column}`; });

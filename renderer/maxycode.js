@@ -205,6 +205,7 @@ function expandImports(src, resolve, errors) {
 
 /**
  * Traduit du MaxyCode en code Scratch. `options.resolve(nom)` renvoie le texte d'un script du projet importé (ou null).
+ * `options.debug` (chemin du script) : ajoute un point de contrôle « debug line » avant chaque instruction, pour le débogueur.
  * Renvoie { code, lines, origins, errors } : lines[i] = ligne d'origine de la ligne produite i, origins[i] = module d'où elle vient.
  */
 export function compileMaxyCode(source, options = {}) {
@@ -244,6 +245,8 @@ export function compileMaxyCode(source, options = {}) {
     }
     if (HAT.test(t)) { fn = null; emit(raw); return; }
     if (t.startsWith('//') || /^(end|else)$/.test(t)) { emit(raw); return; }
+    // Mode débogage : un point de contrôle avant chaque instruction du script (pas dans le code des modules)
+    if (options.debug && !from && !/^import\s/.test(t)) emit(indent + `debug line [${options.debug}:${line}]`);
 
     const ret = /^return(?:\s+(.*))?$/.exec(t);
     if (ret && !fn) { err('« return » s\'utilise seulement dans un bloc « define ».'); emit(indent + '// ' + t); return; }

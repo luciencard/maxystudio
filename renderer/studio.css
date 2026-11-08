@@ -159,7 +159,7 @@ body.un input[type="range"] { width: 100%; accent-color: var(--accent); }
 .un-btools[hidden] { display: none; }
 .un-bbody { flex: 1; min-height: 0; position: relative; }
 .un-project { position: absolute; inset: 0; display: grid; grid-template-columns: 200px 1fr; }
-.un-project[hidden], .un-console[hidden] { display: none; }
+.un-project[hidden], .un-console[hidden], .un-library[hidden], .un-debug[hidden] { display: none; }
 .un-folders { overflow: auto; border-right: 1px solid var(--line); padding: 4px 0; }
 .un-assets-wrap { position: relative; min-width: 0; display: flex; flex-direction: column; }
 .un-crumbs { flex: none; height: 26px; display: flex; align-items: center; gap: 4px; padding: 0 10px; color: var(--text-2); border-bottom: 1px solid var(--line); }
@@ -262,3 +262,19 @@ body.engine-used .un-game-idle { display: none; }
 .lib-more { grid-column: 1 / -1; padding: 8px; border: 1px dashed var(--line, #393b40); border-radius: 6px; background: none; color: inherit; cursor: pointer; }
 .lib-types { display: flex; gap: 4px; }
 #libPack { height: 24px; padding: 0 6px; border: 1px solid var(--line, #393b40); border-radius: 4px; background: var(--bg2, #2b2d30); color: inherit; font: inherit; font-size: 12px; }
+
+/* Débogueur */
+.maxy-bp { background: #e5484d; border-radius: 50%; width: 10px !important; height: 10px !important; margin: 6px 0 0 4px; }
+.maxy-paused-line { background: rgba(255, 207, 58, .18); }
+.maxy-paused-glyph::before { content: '▶'; color: #ffcf3a; font-size: 12px; margin-left: 3px; }
+#debugBtn.on, body.playing #debugBtn { color: #ffcf3a; }
+.un-debug { height: 100%; overflow: auto; padding: 8px 12px; font-size: 12.5px; }
+.dbg-head { padding: 6px 2px 10px; border-bottom: 1px solid var(--line, #393b40); }
+.dbg-paused { color: #ffcf3a; } .dbg-run { color: #5fd39a; }
+.dbg-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding-top: 8px; }
+.dbg-cols h4 { margin: 4px 0 8px; font-size: 12px; color: var(--dim, #9a9da6); text-transform: uppercase; letter-spacing: .04em; }
+.dbg-target { margin-bottom: 10px; }
+.dbg-var, .dbg-line { display: flex; justify-content: space-between; gap: 10px; padding: 3px 6px; border-radius: 4px; cursor: default; }
+.dbg-var:hover, .dbg-line:hover { background: rgba(255,255,255,.05); }
+.dbg-line { cursor: pointer; }
+.dbg-var code, .dbg-line code { color: #ffcf3a; font-family: "JetBrains Mono", Consolas, monospace; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
