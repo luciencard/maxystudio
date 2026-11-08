@@ -980,9 +980,80 @@ function showBottom(tab) {
   document.querySelectorAll('[data-btab]').forEach(b => b.classList.toggle('active', b.dataset.btab === tab));
   $('#projectView').hidden = tab !== 'project';
   $('#consoleView').hidden = tab !== 'console';
+  $('#libraryView').hidden = tab !== 'library';
   $('#projTools').hidden = tab !== 'project';
   $('#consoleTools').hidden = tab !== 'console';
+  $('#libTools').hidden = tab !== 'library';
   if (tab === 'console') renderConsole();
+  if (tab === 'library') openLibrary();
+}
+
+// ---------------- Bibliothèque d'assets (packs Kenney, CC0) ----------------
+const LIB = { index: null, type: null, pack: '', q: '', sel: null, shown: 120, audio: null };
+const LIB_TYPES = [['modele', 'Modèles 3D'], ['son', 'Sons'], ['texture', 'Textures'], ['image', 'Interface']];
+async function openLibrary() {
+  if (!LIB.index) {
+    try { LIB.index = await studio.library.index(); }
+    catch (e) { $('#libInfo').textContent = 'Bibliothèque introuvable : ' + cleanErr(e); return; }
+    LIB.type = S.type === '3d' ? 'modele' : 'image';
+    $('#libTypes').innerHTML = LIB_TYPES.map(([k, l]) => `<button class="un-chip" data-lt="${k}">${l}</button>`).join('');
+    $('#libTypes').querySelectorAll('[data-lt]').forEach(b => b.onclick = () => { LIB.type = b.dataset.lt; LIB.pack = ''; LIB.shown = 120; fillPacks(); renderLibrary(); });
+    $('#libPack').onchange = () => { LIB.pack = $('#libPack').value; LIB.shown = 120; renderLibrary(); };
+    $('#libSearch').oninput = () => { LIB.q = $('#libSearch').value.trim().toLowerCase(); LIB.shown = 120; renderLibrary(); };
+    fillPacks();
+  }
+  renderLibrary();
+}
+function fillPacks() {
+  const packs = LIB.index.packs.filter(p => LIB.index.items.some(i => i.pack === p.id && i.type === LIB.type));
+  $('#libPack').innerHTML = `<option value="">Tous les packs</option>` + packs.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  $('#libTypes').querySelectorAll('[data-lt]').forEach(b => b.classList.toggle('on', b.dataset.lt === LIB.type));
+}
+function libItems() {
+  const words = LIB.q.split(/\s+/).filter(Boolean);
+  return LIB.index.items.filter(i => i.type === LIB.type && (!LIB.pack || i.pack === LIB.pack) &&
+    words.every(w => (i.name + ' ' + i.packName + ' ' + i.pack + ' ' + i.file).toLowerCase().includes(w)));
+}
+function renderLibrary() {
+  if (!LIB.index) return;
+  const list = libItems();
+  $('#libInfo').textContent = `${list.length} élément${list.length > 1 ? 's' : ''} · Kenney (kenney.nl), licence CC0 : libres d'utilisation, même dans un jeu publié.`;
+  const shown = list.slice(0, LIB.shown);
+  $('#libGrid').innerHTML = shown.map((it, i) => `<button class="lib-card${LIB.sel === it ? ' sel' : ''}" data-i="${i}" title="${esc(it.name)} (${esc(it.packName)})">
+      ${it.thumb ? `<img src="/library/${esc(it.thumb)}" loading="lazy" alt="">` : `<span class="lib-ic">${icon(it.type === 'son' ? 'volume' : 'box', 26)}</span>`}
+      <span class="nm">${esc(it.name)}</span></button>`).join('') +
+    (list.length > shown.length ? `<button class="lib-more" id="libMore">Afficher plus (${list.length - shown.length})</button>` : '');
+  $('#libGrid').querySelectorAll('.lib-card').forEach(b => {
+    const it = shown[+b.dataset.i];
+    b.onclick = () => { LIB.sel = it; $('#libGrid').querySelectorAll('.lib-card').forEach(x => x.classList.toggle('sel', x === b)); libActions(); if (it.type === 'son') playLib(it); };
+    b.ondblclick = () => addLib(it);
+  });
+  const more = $('#libMore'); if (more) more.onclick = () => { LIB.shown += 240; renderLibrary(); };
+  libActions();
+}
+function libActions() {
+  const it = LIB.sel && LIB.sel.type === LIB.type ? LIB.sel : null;
+  if (!it) { $('#libActions').innerHTML = '<span class="un-dim">Clique sur un élément, double-clique pour l\'ajouter.</span>'; return; }
+  const toScene = (it.type === 'modele' && S.type === '3d') || ((it.type === 'image' || it.type === 'texture') && S.type !== '3d');
+  $('#libActions').innerHTML = `<b>${esc(it.name)}</b>` + (it.type === 'son' ? `<button class="un-btn sm" id="libPlay">${icon('play', 12)}Écouter</button>` : '') +
+    `<button class="un-btn sm primary" id="libAdd">${icon('plus', 12)}${toScene ? 'Ajouter à la scène' : 'Ajouter au projet'}</button>`;
+  $('#libAdd').onclick = () => addLib(it);
+  const p = $('#libPlay'); if (p) p.onclick = () => playLib(it);
+}
+function playLib(it) {
+  if (LIB.audio) LIB.audio.pause();
+  LIB.audio = new Audio(`/library/${it.file}`); LIB.audio.play().catch(() => {});
+}
+async function addLib(it) {
+  if (S.mode !== 'edit') return toast('Arrête le jeu pour modifier le projet.', true);
+  try {
+    const rel = await studio.library.import(DIR, it.file);
+    await refreshTree();
+    if (it.type === 'modele' && S.type === '3d') { await createObject('model', { name: it.name, model: rel }); toast(`« ${it.name} » ajouté à la scène.`); }
+    else if ((it.type === 'image' || it.type === 'texture') && S.type !== '3d') { await createObject('sprite', { costume: rel }); toast(`Lutin « ${it.name} » ajouté.`); }
+    else toast(`« ${it.name} » ajouté au projet : ${rel}`);
+    log('ok', `Bibliothèque : ${rel}`);
+  } catch (e) { toast(cleanErr(e), true); }
 }
 document.querySelectorAll('[data-btab]').forEach(b => b.onclick = () => showBottom(b.dataset.btab));
 

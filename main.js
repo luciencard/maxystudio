@@ -103,8 +103,12 @@ const encDir = dir => Buffer.from(dir, 'utf8').toString('base64url');
 const decDir = s => Buffer.from(s, 'base64url').toString('utf8');
 
 // Toutes les pages partagent l'origine app://studio pour que l'éditeur puisse piloter le moteur.
+// Bibliothèque d'assets intégrée (packs Kenney, licence CC0) : library/library.json + fichiers.
+const LIB_DIR = path.join(ROOT, 'library');
+
 function resolveAppPath(urlPath) {
   const p = decodeURIComponent(urlPath);
+  if (p.startsWith('/library/')) return safeJoin(LIB_DIR, p.slice('/library/'.length));
   if (p.startsWith('/studio/')) return path.join(UI_DIR, p.slice('/studio/'.length));
   if (p.startsWith('/monaco/')) return path.join(MONACO_DIR, p.slice('/monaco/'.length));
   // Les modules « examples » de three.js sont copiés dans vendor/ : electron-builder exclut les dossiers examples de node_modules.
@@ -561,6 +565,41 @@ ipcMain.handle('file:write', async (_e, dir, rel, content) => {
   await fsp.writeFile(full, content, 'utf8');
   return true;
 });
+// ---------- Bibliothèque d'assets ----------
+let libIndex = null;
+ipcMain.handle('library:index', async () => {
+  if (!libIndex) libIndex = JSON.parse(await fsp.readFile(path.join(LIB_DIR, 'library.json'), 'utf8'));
+  return libIndex;
+});
+/** Copie un élément de la bibliothèque dans le projet (assets/bibliotheque/...), avec ses textures et fichiers liés. Renvoie son chemin. */
+ipcMain.handle('library:import', async (_e, dir, file) => {
+  if (!openDirs.has(dir)) throw new Error('Projet non ouvert.');
+  const src = safeJoin(LIB_DIR, file);
+  if (!src || !fs.existsSync(src) || !/^(modeles|sons|images)\//.test(file)) throw new Error('Élément introuvable dans la bibliothèque.');
+  const rel = 'assets/bibliotheque/' + file;
+  const copy = async (from, to) => {
+    const dest = safeJoin(dir, to);
+    if (fs.existsSync(dest)) return;
+    await fsp.mkdir(path.dirname(dest), { recursive: true });
+    await fsp.copyFile(from, dest);
+  };
+  await copy(src, rel);
+  if (file.startsWith('modeles/')) {
+    const packDir = path.dirname(src), relDir = path.posix.dirname(rel);
+    // Textures partagées du pack et fichiers .bin d'un glTF
+    const tex = path.join(packDir, 'Textures');
+    if (fs.existsSync(tex)) for (const t of await fsp.readdir(tex)) await copy(path.join(tex, t), `${relDir}/Textures/${t}`);
+    if (/\.gltf$/i.test(file)) {
+      const gltf = JSON.parse(await fsp.readFile(src, 'utf8'));
+      for (const b of [...(gltf.buffers || []), ...(gltf.images || [])]) {
+        if (b.uri && !/^data:/.test(b.uri) && !b.uri.includes('..')) { const from = path.join(packDir, decodeURIComponent(b.uri)); if (fs.existsSync(from)) await copy(from, `${relDir}/${decodeURIComponent(b.uri)}`); }
+      }
+    }
+    for (const t of await fsp.readdir(packDir)) if (/\.(png|jpg)$/i.test(t)) await copy(path.join(packDir, t), `${relDir}/${t}`);
+  }
+  return rel;
+});
+
 ipcMain.handle('file:writeBinary', async (_e, dir, rel, base64) => {
   const full = safeJoin(dir, rel);
   await fsp.mkdir(path.dirname(full), { recursive: true });

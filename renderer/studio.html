@@ -103,11 +103,17 @@
         <div class="un-tabs">
           <button class="un-tab active" data-btab="project"><span data-ic="folder" data-size="13"></span>Projet</button>
           <button class="un-tab" data-btab="console"><span data-ic="terminal" data-size="13"></span>Console <span class="un-count" id="logCount"></span></button>
+          <button class="un-tab" data-btab="library"><span data-ic="box" data-size="13"></span>Bibliothèque</button>
           <span class="grow"></span>
           <div class="un-btools" id="projTools">
             <button class="un-btn sm" id="importBtn"><span data-ic="download" data-size="13"></span>Importer</button>
             <button class="un-btn sm" id="createBtn"><span data-ic="plus" data-size="13"></span>Créer</button>
             <div class="un-search sm"><span data-ic="search" data-size="12"></span><input id="assetSearch" placeholder="Rechercher" spellcheck="false"></div>
+          </div>
+          <div class="un-btools" id="libTools" hidden>
+            <div class="lib-types" id="libTypes"></div>
+            <select class="un-select sm" id="libPack"></select>
+            <div class="un-search sm"><span data-ic="search" data-size="12"></span><input id="libSearch" placeholder="Rechercher (arbre, voiture, explosion…)" spellcheck="false"></div>
           </div>
           <div class="un-btools" id="consoleTools" hidden>
             <button class="un-btn sm" id="clearLog">Effacer</button>
@@ -128,6 +134,10 @@
             </div>
           </div>
           <div class="un-console" id="consoleView" hidden></div>
+          <div class="un-library" id="libraryView" hidden>
+            <div class="lib-bar" id="libBar"><span id="libInfo">Chargement de la bibliothèque…</span><span class="grow"></span><span id="libActions"></span></div>
+            <div class="lib-grid" id="libGrid"></div>
+          </div>
         </div>
       </section>
     </main>

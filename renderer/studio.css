@@ -247,3 +247,18 @@ body.un input[type="range"] { width: 100%; accent-color: var(--accent); }
 .un-game-idle b { font-size: 17px; }
 .un-game-idle span { color: #b9bdd0; font-size: 13px; margin-bottom: 6px; }
 body.engine-used .un-game-idle { display: none; }
+
+/* Bibliothèque d'assets */
+.un-library { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.lib-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line, #393b40); font-size: 12px; color: var(--dim, #9a9da6); }
+.lib-bar b { color: var(--text, #dfe1e5); margin-right: 4px; }
+.lib-grid { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; padding: 10px; align-content: start; }
+.lib-card { display: grid; justify-items: center; gap: 4px; padding: 6px 4px; border: 1px solid transparent; border-radius: 6px; background: rgba(255,255,255,.03); color: inherit; cursor: pointer; font: inherit; }
+.lib-card:hover { background: rgba(255,255,255,.07); }
+.lib-card.sel { border-color: var(--accent, #3574f0); background: rgba(53,116,240,.15); }
+.lib-card img { width: 72px; height: 72px; object-fit: contain; image-rendering: auto; }
+.lib-card .lib-ic { display: grid; place-items: center; width: 72px; height: 72px; color: var(--dim, #9a9da6); }
+.lib-card .nm { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.lib-more { grid-column: 1 / -1; padding: 8px; border: 1px dashed var(--line, #393b40); border-radius: 6px; background: none; color: inherit; cursor: pointer; }
+.lib-types { display: flex; gap: 4px; }
+#libPack { height: 24px; padding: 0 6px; border: 1px solid var(--line, #393b40); border-radius: 4px; background: var(--bg2, #2b2d30); color: inherit; font: inherit; font-size: 12px; }
