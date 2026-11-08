@@ -94,11 +94,12 @@ function kindOf(rel) {
   if (core.SOUND_EXT.includes(e)) return 'sound';
   if (e === 'sc') return 'sc';
   if (e === 'scene') return 'scene';
+  if (e === 'prefab') return 'prefab';
   if (e === 'md') return 'md';
   if (e === 'json' || e === 'maxycode' || e === 'scratchcode') return 'json';
   return 'file';
 }
-const KIND_ICON = { model: 'box', image: 'image', sound: 'volume', sc: 'fileCode', scene: 'scene', md: 'book', json: 'braces', file: 'file', dir: 'folder' };
+const KIND_ICON = { model: 'box', image: 'image', sound: 'volume', sc: 'fileCode', scene: 'scene', prefab: 'copy', md: 'book', json: 'braces', file: 'file', dir: 'folder' };
 async function refreshTree() {
   const p = await studio.readProject(DIR);
   S.config = p.config; S.tree = p.tree; S.base = p.assetBase;
@@ -107,8 +108,7 @@ async function refreshTree() {
 async function writeText(rel, text) { markOwnWrite(rel); await studio.writeFile(DIR, rel, text); }
 
 // ---------------- Scène : chargement, sauvegarde, annuler ----------------
-function normalizeScene() {
-  const sc = S.scene;
+function normalizeScene(sc = S.scene) {
   sc.objects = sc.objects || [];
   if (S.type === '3d') {
     sc.environment = Object.assign(core.defaultEnvironment(), sc.environment || {});
@@ -331,7 +331,7 @@ function renderHier() {
     for (const o of S.scene.objects) if (o.parent && !findObj(o.parent)) o.parent = null;
     walk(null, 1);
   } else {
-    html += `<div class="un-row root${S.sel === '__stage' ? ' sel' : ''}" data-id="__stage" style="padding-left:6px"><span class="tw">${icon('chevronDown', 12)}</span><span class="oi k-stage">${icon(S.type === 'app' ? 'app' : 'image', 14)}</span><span class="nm">${S.type === 'app' ? 'Application' : 'Scène'}</span>${S.scene.stage.script ? '<span class="tag">script</span>' : ''}</div>`;
+    html += `<div class="un-row root${S.sel === '__stage' ? ' sel' : ''}" data-id="__stage" style="padding-left:6px"><span class="tw">${icon('chevronDown', 12)}</span><span class="oi k-stage">${icon(S.type === 'app' ? 'app' : 'image', 14)}</span><span class="nm">${S.type === 'app' ? 'Application' : 'Scène'}</span>${sceneFiles().length > 1 ? `<span class="tag">${esc(stem(S.scenePath))}</span>` : ''}${S.scene.stage.script ? '<span class="tag">script</span>' : ''}</div>`;
     for (const o of S.scene.objects) if (!q || o.name.toLowerCase().includes(q)) html += row(o, 1, false);
   }
   if (!S.scene.objects.length) html += `<div class="un-empty">${S.type === 'app' ? 'Le code de l\'application est dans le script de « Application ». Tu peux aussi ajouter des lutins.' : 'La scène est vide.<br>Clique sur + pour créer un objet.'}</div>`;
@@ -403,6 +403,7 @@ function objectMenu(id) {
     '-',
     S.type === '3d' && { label: 'Cadrer dans la vue Scène', ic: 'maximize', key: 'F', fn: () => { activateTab('scene'); view.focus(id); } },
     o.script ? { label: `Ouvrir ${base(o.script)}`, ic: 'fileCode', fn: () => openScript(o.script) } : { label: 'Ajouter un script…', ic: 'fileCode', fn: () => newScriptFor(o) },
+    '-', o.prefab ? { label: 'Appliquer au prefab', ic: 'copy', fn: () => applyPrefab(o.id) } : { label: 'Créer un prefab', ic: 'copy', fn: () => makePrefab(o.id) },
     S.type === '3d' && '-', S.type === '3d' && { label: 'Détacher du parent', ic: 'layers', disabled: !o.parent, fn: () => reparent(id, null) },
     ...(S.type === '3d' ? ['-', ...createItems(id).slice(1).filter(x => typeof x !== 'string' || x === '-').slice(0, 9).map(it => it === '-' ? null : { ...it, label: `Enfant : ${it.label}` })] : [])
   ];
@@ -471,6 +472,7 @@ function renderObj3D(box, o) {
   if (o.collider) html += comp('collider', 'shield', 'Collision', `<div class="full in-note">Les objets avec la physique ne traversent pas cet objet. Sa boîte englobante sert aux blocs <code>touching object</code>.</div>`, { remove: 'collider' });
   if (o.rigidbody && o.rigidbody.enabled) html += comp('rigidbody', 'physics', 'Physique', `${lbl('Gravité', 'rigidbody.gravity', 0.02)}${num('rigidbody.gravity', o.rigidbody.gravity ?? 1, 0.1)}${lbl('Rebond')}${range('rigidbody.bounce', o.rigidbody.bounce || 0, 0, 1, 0.05)}
     <div class="full in-note">L'objet tombe et se pose sur les objets avec collision. Blocs utiles : <code>jump with force (6)</code>, <code>set velocity to x: y: z:</code>.</div>`, { remove: 'rigidbody' });
+  if (o.prefab) html += prefabComp(o);
   if (o.script) html += scriptComp(o);
   html += `<div class="in-add"><button class="un-btn" data-act="addComp">${icon('plus', 13)}Ajouter un composant</button></div>`;
   box.innerHTML = html;
@@ -486,6 +488,7 @@ function renderSprite(box, o) {
     ${lbl('Déplaçable')}${check('draggable', o.draggable, 'Pendant le jeu')}`);
   html += comp('costumes', 'image', 'Costumes', thumbs(o.costumes, 'image'));
   html += comp('sounds', 'volume', 'Sons', thumbs(o.sounds, 'sound'));
+  if (o.prefab) html += prefabComp(o);
   html += scriptComp(o);
   box.innerHTML = html;
   box.querySelectorAll('[data-up] .ic').forEach(i => { i.style.transform = 'rotate(180deg)'; });
@@ -592,6 +595,9 @@ function bindInsp(root, target, howOf, scope) {
   const act = (a, fn) => { const b = area.querySelector(`[data-act="${a}"]`); if (b) b.onclick = fn; };
   act('openScript', () => target.script && openScript(target.script));
   act('newScript', () => newScriptFor(target));
+  act('prefabApply', () => applyPrefab(target.id));
+  act('prefabUpdate', () => updateInstances(target.prefab));
+  act('prefabDetach', () => detachPrefab(target.id));
   act('addComp', e => menuAt(e.currentTarget, [
     'Ajouter un composant',
     { label: 'Physique', ic: 'physics', disabled: target.rigidbody && target.rigidbody.enabled, fn: () => { snapshot(); target.rigidbody = { enabled: true, gravity: 1, bounce: 0 }; if (!target.collider) target.collider = true; saveScene(); renderInsp(); } },
@@ -747,6 +753,8 @@ function renderAssets() {
       if (isDir) { S.folder = p; S.folderOpen.add(p); renderFolders(); renderAssets(); return; }
       const k = kindOf(p);
       if (k === 'sc' || k === 'md' || k === 'json') openScript(p);
+      else if (k === 'scene') openScene(p);
+      else if (k === 'prefab') placePrefab(p);
       else if (k === 'model' && S.type === '3d') createObject('model', { name: stem(p), model: p });
       else if (k === 'image' && S.type !== '3d') createObject('sprite', { costume: p });
       else selectAsset(p);
@@ -849,6 +857,7 @@ wrap.addEventListener('drop', async e => {
 // Dépôt d'un asset dans la vue Scène ou la hiérarchie
 async function dropAsset(rel, point, onId) {
   const k = kindOf(rel);
+  if (k === 'prefab') return placePrefab(rel, point);
   const target = onId && findObj(onId);
   if (S.type === '3d') {
     if (k === 'model') return createObject('model', { name: stem(rel), model: rel, position: point ? point.map(v => Math.round(v * 100) / 100) : spawnPoint() }, null);
@@ -1058,6 +1067,209 @@ async function addLib(it) {
 }
 document.querySelectorAll('[data-btab]').forEach(b => b.onclick = () => showBottom(b.dataset.btab));
 
+
+// ---------------- Lancer une scène (Lecture, ou changement de niveau en jeu) ----------------
+async function runScene(sc, scene, vars, name) {
+  sc.vm.stopAll();
+  const b64 = await studio.playArchive(DIR, playSpec(scene));
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  // Le tampon doit appartenir à la fenêtre du moteur (sinon « instanceof ArrayBuffer » échoue)
+  await sc.loadSb3(new frame.contentWindow.Uint8Array(bytes).buffer);
+  await sc.loadExtension(EXTUI);
+  if (S.type === '3d') await sc.loadExtension(EXT3D);
+  frame.contentWindow.__scProject = { type: S.type, scene: JSON.parse(JSON.stringify(scene)), base: S.base };
+  frame.contentWindow.__maxySceneName = name;
+  frame.contentWindow.__maxyGoToScene = goToScene;
+  frame.contentWindow.__scPaused = false;
+  for (const el of frame.contentDocument.querySelectorAll('html, body, .gui, .stage-pane, .stage-wrap')) { el.scrollTop = 0; el.scrollLeft = 0; }
+  const vm = sc.vm;
+  let errors = 0;
+  S.problems = {};
+  const compile = async (target, rel) => {
+    // MaxyCode (fonctions qui renvoient une valeur…) est d'abord traduit en blocs Scratch ; les erreurs gardent les lignes d'origine.
+    const src = await readScript(rel);
+    // Modules importés (scripts du projet) : lus d'avance, avec leurs propres imports
+    const mods = {};
+    const load = async text => {
+      for (const name of findImports(text)) {
+        if (name in mods || STDLIB[name] != null) continue;
+        mods[name] = allFiles().includes(name) ? await readScript(name) : null;
+        if (mods[name]) await load(mods[name]);
+      }
+    };
+    await load(src);
+    const mc = compileMaxyCode(src, { resolve: name => mods[name] ?? null });
+    const list = (await sc.setCode(target, mc.code)) || [];
+    const errs = [...mc.errors, ...list.map(e => {
+      const raw = Number(e.line ?? e.lineNumber ?? (e.from && e.from.line) ?? 1) || 1;
+      const from = originOf(mc, raw);
+      return { line: originalLine(mc, raw), message: (from ? `[${from}] ` : '') + String(e.message ?? e.msg ?? e) };
+    })];
+    if (rel) S.problems[rel] = (S.problems[rel] || []).concat(errs);
+    for (const e of errs) { errors++; log('error', e.message, { loc: { rel, line: e.line } }); }
+  };
+  const stageRel = S.type === '3d' ? scene.worldScript : scene.stage.script;
+  await compile(vm.runtime.getTargetForStage(), stageRel);
+  const byName = new Map(vm.runtime.targets.filter(t => t.isOriginal && !t.isStage).map(t => [t.getName(), t]));
+  for (const o of scene.objects) {
+    const t = byName.get(o.name);
+    if (t && o.script) await compile(t, o.script);
+  }
+  for (const rel of S.models.keys()) applyMarkers(rel);
+  updateInspection();
+  if (errors) log('warn', `${errors} erreur${errors > 1 ? 's' : ''} : les scripts concernés ne sont pas chargés.`);
+  else log('ok', 'Compilation réussie, aucune erreur.');
+  if (vars) restoreVars(vm, vars);
+  vm.greenFlag();
+  frame.focus();
+}
+/** Variables de la Scène (hors variables internes « _… ») : elles passent d'un niveau à l'autre. */
+function saveVars(vm) {
+  const st = vm.runtime.getTargetForStage();
+  return Object.values(st.variables).filter(v => (v.type === '' || v.type === 'list') && !v.name.startsWith('_'))
+    .map(v => ({ name: v.name, type: v.type, value: Array.isArray(v.value) ? v.value.slice() : v.value }));
+}
+function restoreVars(vm, vars) {
+  const st = vm.runtime.getTargetForStage();
+  for (const s of vars) {
+    let v = Object.values(st.variables).find(x => x.name === s.name && x.type === s.type);
+    if (!v) { st.createVariable(`maxy_${s.type}_${s.name}`, s.name, s.type); v = Object.values(st.variables).find(x => x.name === s.name && x.type === s.type); }
+    if (v) v.value = Array.isArray(s.value) ? s.value.slice() : s.value;
+  }
+}
+const sceneFiles = () => allFiles().filter(r => r.endsWith('.scene')).sort();
+const findSceneFile = name => {
+  const n = String(name).trim().replace(/\.scene$/i, '');
+  return sceneFiles().find(r => stem(r) === n) || sceneFiles().find(r => stem(r).toLowerCase() === n.toLowerCase()) || null;
+};
+/** Bloc « go to scene [nom] » : charge une autre scène pendant le jeu, en gardant les variables de la Scène. */
+async function goToScene(name) {
+  if (S.mode === 'edit') return;
+  const rel = findSceneFile(name);
+  if (!rel) { log('error', `Scène introuvable : « ${name} ». Scènes du projet : ${sceneFiles().map(stem).join(', ')}.`); return; }
+  try {
+    const scene = rel === S.scenePath ? JSON.parse(JSON.stringify(S.scene)) : JSON.parse(await studio.readFile(DIR, rel));
+    normalizeScene(scene);
+    const sc = engine();
+    const vars = saveVars(sc.vm);
+    log('log', `Scène « ${stem(rel)} »`);
+    await runScene(sc, scene, vars, stem(rel));
+  } catch (e) { log('error', 'Changement de scène impossible : ' + cleanErr(e)); }
+}
+
+// ---------------- Scènes : créer, ouvrir, scène de départ ----------------
+async function openScene(rel) {
+  if (rel === S.scenePath) return;
+  if (S.mode !== 'edit') return toast('Arrête le jeu pour changer de scène.', true);
+  await saveSceneNow();
+  S.scenePath = rel; S.undo = []; S.redo = []; S.sel = null;
+  await loadScene();
+  activateTab('scene');
+  status(`Scène « ${stem(rel)} » ouverte`);
+}
+async function newScene() {
+  if (S.mode !== 'edit') return toast('Arrête le jeu pour créer une scène.', true);
+  const n = await ask('Nom de la nouvelle scène', `Niveau ${sceneFiles().length + 1}`);
+  if (!n) return;
+  const rel = `scenes/${n.replace(/[<>:"/\\|?*]/g, '').trim()}.scene`;
+  if (allFiles().includes(rel)) return toast('Une scène porte déjà ce nom.', true);
+  const cur = S.scene;
+  const scene = S.type === '3d'
+    ? { format: 'scratchcode-scene', version: 1, type: '3d', environment: JSON.parse(JSON.stringify(cur.environment || {})), worldScript: cur.worldScript || '',
+        objects: cur.objects.filter(o => o.kind === 'camera').slice(0, 1).map(o => ({ ...JSON.parse(JSON.stringify(o)), id: core.newId(), parent: null })) }
+    : { format: 'scratchcode-scene', version: 1, type: S.type, stage: { backdrops: (cur.stage.backdrops || []).slice(0, 1), script: cur.stage.script || '' }, objects: [] };
+  await writeText(rel, JSON.stringify(scene, null, 2));
+  await refreshTree();
+  await openScene(rel);
+  log('ok', `Scène créée : ${rel}. Le script de la scène est partagé ; change de niveau en jeu avec go to scene [${stem(rel)}].`);
+}
+function chooseScene() {
+  const items = sceneFiles().map(rel => ({ label: stem(rel) + (rel === (S.config.mainScene || 'scenes/Main.scene') ? ' (départ)' : ''), ic: 'scene', disabled: rel === S.scenePath, fn: () => openScene(rel) }));
+  showMenu(innerWidth / 2 - 120, 60, items.length ? items : [{ label: 'Aucune autre scène', ic: 'info', disabled: true, fn: () => {} }]);
+}
+async function setStartScene() {
+  const cfgRel = allFiles().includes('project.maxycode') ? 'project.maxycode' : 'project.scratchcode';
+  S.config.mainScene = S.scenePath;
+  await writeText(cfgRel, JSON.stringify(S.config, null, 2));
+  renderHier();
+  toast(`« ${stem(S.scenePath)} » est la scène de départ.`);
+}
+
+// ---------------- Prefabs : un objet (avec ses enfants et son script) réutilisable ----------------
+function prefabComp(o) {
+  return comp('prefab', 'copy', 'Prefab', `<div class="full in-note">Instance de <b>${esc(stem(o.prefab))}</b>. Modifie-la, puis applique les changements au prefab, ou mets à jour toutes ses instances de la scène.</div>
+    <div class="full in-row2"><button class="un-btn sm" data-act="prefabApply">${icon('save', 12)}Appliquer au prefab</button><button class="un-btn sm" data-act="prefabUpdate">${icon('refresh', 12)}Mettre à jour les instances</button></div>
+    <div class="full in-row2"><button class="un-btn sm" data-act="prefabDetach">${icon('x', 12)}Détacher du prefab</button></div>`);
+}
+/** Copie d'un objet et de ses descendants, avec des positions relatives à la racine. */
+function prefabData(root) {
+  const objs = [root, ...(S.type === '3d' ? descendants(root.id) : [])].map(o => JSON.parse(JSON.stringify(o)));
+  objs[0] = { ...objs[0], parent: null };
+  delete objs[0].prefab;
+  return { format: 'maxy-prefab', version: 1, type: S.type, objects: objs };
+}
+async function makePrefab(id) {
+  const o = findObj(id); if (!o) return;
+  const n = await ask('Nom du prefab', o.name);
+  if (!n) return;
+  const rel = `assets/prefabs/${n.replace(/[<>:"/\\|?*]/g, '').trim()}.prefab`;
+  await writeText(rel, JSON.stringify(prefabData(o), null, 2));
+  snapshot(); o.prefab = rel; saveScene();
+  await refreshTree(); renderHier(); renderInsp();
+  toast(`Prefab créé : ${rel}. Double-clique dessus (panneau Projet) pour en placer d'autres.`);
+}
+/** Place une instance du prefab dans la scène (au point visé, ou devant la caméra). */
+async function placePrefab(rel, point) {
+  if (S.mode !== 'edit') return toast('Arrête le jeu pour modifier la scène.', true);
+  let data;
+  try { data = JSON.parse(await studio.readFile(DIR, rel)); } catch { return toast('Prefab illisible.', true); }
+  if (data.type !== S.type) return toast(`Ce prefab est fait pour un projet ${data.type === '3d' ? '3D' : '2D'}.`, true);
+  snapshot();
+  const map = new Map();
+  const objs = data.objects.map(o => { const c = JSON.parse(JSON.stringify(o)); map.set(o.id, c.id = core.newId()); return c; });
+  for (const c of objs) if (c.parent) c.parent = map.get(c.parent) || null;
+  const root = objs[0];
+  root.name = uniqueName(root.name);
+  root.prefab = rel;
+  if (S.type === '3d') root.position = point ? point.map(v => Math.round(v * 100) / 100) : spawnPoint();
+  else if (point) { root.x = point[0]; root.y = point[1]; }
+  S.scene.objects.push(...objs);
+  await view.load(S.scene);
+  select(root.id); saveScene(); renderHier();
+  status(`Instance de « ${stem(rel)} » placée`);
+}
+async function applyPrefab(id) {
+  const o = findObj(id); if (!o || !o.prefab) return;
+  await writeText(o.prefab, JSON.stringify(prefabData(o), null, 2));
+  toast(`Prefab « ${stem(o.prefab)} » mis à jour. « Mettre à jour les instances » recopie ces changements sur les autres.`);
+}
+/** Remplace chaque instance du prefab dans la scène par son contenu, en gardant sa position, sa rotation et son nom. */
+async function updateInstances(rel) {
+  let data;
+  try { data = JSON.parse(await studio.readFile(DIR, rel)); } catch { return toast('Prefab illisible.', true); }
+  const roots = S.scene.objects.filter(o => o.prefab === rel);
+  if (!roots.length) return;
+  snapshot();
+  for (const r of roots) {
+    const drop = new Set([r.id, ...(S.type === '3d' ? descendants(r.id).map(d => d.id) : [])]);
+    const keep = S.type === '3d' ? { position: r.position, rotation: r.rotation, name: r.name, parent: r.parent } : { x: r.x, y: r.y, name: r.name };
+    const at = S.scene.objects.indexOf(r);
+    S.scene.objects = S.scene.objects.filter(o => !drop.has(o.id));
+    const map = new Map();
+    const objs = data.objects.map(o => { const c = JSON.parse(JSON.stringify(o)); map.set(o.id, c.id = o === data.objects[0] ? r.id : core.newId()); return c; });
+    for (const c of objs) if (c.parent && map.has(c.parent)) c.parent = map.get(c.parent);
+    Object.assign(objs[0], keep, { prefab: rel });
+    S.scene.objects.splice(Math.min(at, S.scene.objects.length), 0, ...objs);
+  }
+  await view.load(S.scene);
+  saveScene(); renderHier(); renderInsp();
+  toast(`${roots.length} instance${roots.length > 1 ? 's' : ''} de « ${stem(rel)} » mise${roots.length > 1 ? 's' : ''} à jour.`);
+}
+function detachPrefab(id) {
+  const o = findObj(id); if (!o) return;
+  snapshot(); delete o.prefab; saveScene(); renderInsp(); renderHier();
+}
+
 // ---------------- Moteur de jeu (onglet Jeu) ----------------
 const frame = $('#engine');
 const ENGINE_CSS = `
@@ -1109,10 +1321,10 @@ async function readScript(rel) {
   if (S.models.has(rel)) return S.models.get(rel).getValue();
   try { return await studio.readFile(DIR, rel); } catch { log('error', `Script introuvable : ${rel}`); return ''; }
 }
-function playSpec() {
+function playSpec(scene = S.scene) {
   const names = new Set();
   const sprites = [];
-  for (const o of S.scene.objects) {
+  for (const o of scene.objects) {
     if (S.type === '3d') {
       if (!o.script) continue;
       if (names.has(o.name)) { log('warn', `Deux objets s'appellent « ${o.name} » : seul le premier exécute son script. Renomme l'autre.`); continue; }
@@ -1124,7 +1336,7 @@ function playSpec() {
       sprites.push({ name: o.name, x: o.x, y: o.y, size: o.size, direction: o.direction, visible: o.visible !== false, rotationStyle: o.rotationStyle, draggable: o.draggable, costumes: o.costumes.map(rel => ({ rel, name: stem(rel) })), sounds: o.sounds.map(rel => ({ rel, name: stem(rel) })) });
     }
   }
-  const backdrops = S.type === '3d' ? [] : (S.scene.stage.backdrops || []).map(rel => ({ rel, name: stem(rel) }));
+  const backdrops = S.type === '3d' ? [] : (scene.stage.backdrops || []).map(rel => ({ rel, name: stem(rel) }));
   return { stage: { costumes: backdrops }, sprites };
 }
 async function play() {
@@ -1135,58 +1347,10 @@ async function play() {
     status('Compilation…');
     const sc = await waitEngine();
     await settleEngine(sc);
-    sc.vm.stopAll();
-    const b64 = await studio.playArchive(DIR, playSpec());
-    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-    // Le tampon doit appartenir à la fenêtre du moteur (sinon « instanceof ArrayBuffer » échoue)
-    await sc.loadSb3(new frame.contentWindow.Uint8Array(bytes).buffer);
-    await sc.loadExtension(EXTUI);
-    if (S.type === '3d') await sc.loadExtension(EXT3D);
-    frame.contentWindow.__scProject = { type: S.type, scene: JSON.parse(JSON.stringify(S.scene)), base: S.base };
-    frame.contentWindow.__scPaused = false;
-    for (const el of frame.contentDocument.querySelectorAll('html, body, .gui, .stage-pane, .stage-wrap')) { el.scrollTop = 0; el.scrollLeft = 0; }
-    const vm = sc.vm;
-    let errors = 0;
-    S.problems = {};
-    const compile = async (target, rel) => {
-      // MaxyCode (fonctions qui renvoient une valeur…) est d'abord traduit en blocs Scratch ; les erreurs gardent les lignes d'origine.
-      const src = await readScript(rel);
-      // Modules importés (scripts du projet) : lus d'avance, avec leurs propres imports
-      const mods = {};
-      const load = async text => {
-        for (const name of findImports(text)) {
-          if (name in mods || STDLIB[name] != null) continue;
-          mods[name] = allFiles().includes(name) ? await readScript(name) : null;
-          if (mods[name]) await load(mods[name]);
-        }
-      };
-      await load(src);
-      const mc = compileMaxyCode(src, { resolve: name => mods[name] ?? null });
-      const list = (await sc.setCode(target, mc.code)) || [];
-      const errs = [...mc.errors, ...list.map(e => {
-        const raw = Number(e.line ?? e.lineNumber ?? (e.from && e.from.line) ?? 1) || 1;
-        const from = originOf(mc, raw);
-        return { line: originalLine(mc, raw), message: (from ? `[${from}] ` : '') + String(e.message ?? e.msg ?? e) };
-      })];
-      if (rel) S.problems[rel] = (S.problems[rel] || []).concat(errs);
-      for (const e of errs) { errors++; log('error', e.message, { loc: { rel, line: e.line } }); }
-    };
-    const stageRel = S.type === '3d' ? S.scene.worldScript : S.scene.stage.script;
-    await compile(vm.runtime.getTargetForStage(), stageRel);
-    const byName = new Map(vm.runtime.targets.filter(t => t.isOriginal && !t.isStage).map(t => [t.getName(), t]));
-    for (const o of S.scene.objects) {
-      const t = byName.get(o.name);
-      if (t && o.script) await compile(t, o.script);
-    }
-    for (const rel of S.models.keys()) applyMarkers(rel);
-    updateInspection();
-    if (errors) log('warn', `${errors} erreur${errors > 1 ? 's' : ''} : les scripts concernés ne sont pas chargés.`);
-    else log('ok', 'Compilation réussie, aucune erreur.');
+    await runScene(sc, S.scene, null, stem(S.scenePath));
     document.body.classList.add('engine-used');
     setMode('play');
     activateTab('game');
-    vm.greenFlag();
-    frame.focus();
     if (plugins) plugins.emit('play');
   } catch (e) {
     log('error', 'Lancement impossible : ' + cleanErr(e));
@@ -1276,6 +1440,10 @@ const MENUS = {
   file: () => [
     { label: 'Nouveau projet…', ic: 'folderPlus', fn: () => studio.showHub() },
     { label: 'Ouvrir un projet…', ic: 'folderOpen', fn: () => studio.showHub() },
+    '-',
+    { label: 'Nouvelle scène…', ic: 'scene', fn: newScene },
+    { label: 'Ouvrir une scène', ic: 'scene', fn: chooseScene },
+    { label: 'Définir comme scène de départ', ic: 'flag', disabled: S.scenePath === (S.config.mainScene || 'scenes/Main.scene'), fn: setStartScene },
     '-',
     { label: 'Tout enregistrer', ic: 'save', key: 'Ctrl+S', fn: saveAll },
     { label: 'Exporter le projet (.maxycode)…', ic: 'share', fn: exportProject },
