@@ -2,7 +2,7 @@
   "id": "arena-builder",
   "name": "Bâtisseur d'arène",
   "version": "1.0.0",
-  "author": "ScratchCode Team",
+  "author": "MaxyStudio Team",
   "description": "Construit une arène 3D en un clic : sol, murs, caisses, piliers et rampes, avec les tailles et les couleurs de ton choix.",
   "main": "plugin.js",
   "icon": "hammer"

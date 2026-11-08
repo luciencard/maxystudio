@@ -1,4 +1,4 @@
-// Extension « ScratchCode 3D » : les blocs 3D des projets de MaxyStudio.
+// Extension « MaxyCode 3D » : les blocs 3D des projets de MaxyStudio.
 // Chaque objet de la scène qui a un script est un lutin du même nom : « this object » désigne cet objet.
 (function (Scratch) {
   'use strict';
@@ -327,7 +327,7 @@
   const rep = (opcode, text, args = {}) => ({ opcode, blockType: Scratch.BlockType.REPORTER, text, arguments: args, disableMonitor: true });
   const bool = (opcode, text, args = {}) => ({ opcode, blockType: Scratch.BlockType.BOOLEAN, text, arguments: args });
 
-  class ScratchCode3D {
+  class MaxyCode3D {
     getInfo() {
       return {
         id: 'sc3dengine', name: '3D', color1: '#3d7bd9', color2: '#2f63b3', color3: '#24508f',
@@ -527,7 +527,7 @@
   }
   // Comme les blocs de mouvement de Scratch, chaque commande demande un redessin :
   // une boucle « forever » ne fait alors qu'un tour par image au lieu de milliers.
-  const ext = new ScratchCode3D();
+  const ext = new MaxyCode3D();
   for (const b of ext.getInfo().blocks) {
     if (b.blockType !== Scratch.BlockType.COMMAND || typeof ext[b.opcode] !== 'function') continue;
     const fn = ext[b.opcode].bind(ext);

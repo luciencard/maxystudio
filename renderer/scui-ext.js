@@ -54,7 +54,7 @@
   const S = (v = '') => ({ type: Scratch.ArgumentType.STRING, defaultValue: v });
   const cmd = (opcode, text, args = {}) => ({ opcode, blockType: Scratch.BlockType.COMMAND, text, arguments: args });
 
-  class ScratchCodeUI {
+  class MaxyCodeUI {
     getInfo() {
       return {
         id: 'scuiapp', name: 'Interface', color1: '#e6457a', color2: '#c73a69', color3: '#a32f56',
@@ -117,5 +117,5 @@
       root().appendChild(el); setTimeout(() => el.remove(), 2600);
     }
   }
-  Scratch.extensions.register(new ScratchCodeUI());
+  Scratch.extensions.register(new MaxyCodeUI());
 })(Scratch);

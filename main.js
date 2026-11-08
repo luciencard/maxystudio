@@ -3,9 +3,9 @@
 //   MonJeu/
 //     project.maxycode      configuration (type 2d, 3d ou app, scène principale...) ; project.scratchcode avant la 2.1
 //     scenes/Main.scene     objets de la scène (JSON)
-//     scripts/*.sc          un script par objet, en ScratchCode
+//     scripts/*.sc          un script par objet, en MaxyCode
 //     assets/               modèles 3D, images, sons importés
-//     SCRATCHCODE.md        guide de syntaxe (utile aux assistants IA)
+//     MAXYCODE.md           guide de syntaxe (utile aux assistants IA) ; SCRATCHCODE.md avant la 2.1
 // Un projet entier peut aussi être échangé en un seul fichier .maxycode (archive zip ; .scratchcode avant la 2.1).
 
 const { app, BrowserWindow, ipcMain, dialog, protocol, shell, Menu } = require('electron');
@@ -474,7 +474,7 @@ async function openPathArg(p) {
   if (st.isDirectory()) { await openProjectWindow(p); return true; }
   if ([CFG, OLD_CFG].includes(path.basename(p))) { await openProjectWindow(path.dirname(p)); return true; }
   if (/\.(maxycode|scratchcode)$/i.test(p)) {
-    const dir = await importArchive(p, path.join(app.getPath('documents'), 'ScratchCode Projects'));
+    const dir = await importArchive(p, path.join(app.getPath('documents'), 'MaxyStudio Projects'));
     await openProjectWindow(dir);
     return true;
   }
@@ -482,7 +482,7 @@ async function openPathArg(p) {
 }
 
 // ---------- IPC ----------
-const defaultLocation = () => path.join(app.getPath('documents'), 'ScratchCode Projects');
+const defaultLocation = () => path.join(app.getPath('documents'), 'MaxyStudio Projects');
 ipcMain.handle('recent:list', async () => (await readRecent()).filter(p => isProjectDir(p.path)));
 ipcMain.handle('recent:remove', async (_e, dir) => {
   const list = (await readRecent()).filter(p => p.path !== dir);

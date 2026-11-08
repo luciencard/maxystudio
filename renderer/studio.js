@@ -524,7 +524,7 @@ function renderEnv(box) {
   bindInsp(box.querySelector('[data-comp="worldScript"]'), S.scene, () => 'none');
   const act = (a, fn) => { const b = box.querySelector(`[data-act="${a}"]`); if (b) b.onclick = fn; };
   act('openWorld', () => openScript(S.scene.worldScript));
-  act('newWorld', async () => { const rel = await newScript('Monde', 'when app run\nprint [Le monde démarre.]\n'); if (rel) { snapshot(); S.scene.worldScript = rel; saveScene(); renderInsp(); renderHier(); } });
+  act('newWorld', async () => { const rel = await newScript('Monde', 'when app run\n'); if (rel) { snapshot(); S.scene.worldScript = rel; saveScene(); renderInsp(); renderHier(); } });
 }
 
 function bindInsp(root, target, howOf, scope) {
@@ -830,7 +830,7 @@ async function afterImport(list) {
 }
 $('#importBtn').onclick = importAssets;
 $('#createBtn').onclick = e => menuAt(e.currentTarget, ['Créer',
-  { label: 'Script ScratchCode', ic: 'fileCode', fn: () => newScript('Script', S.type === '3d' ? 'when app run\nforever\n    rotate by x: (0) y: (2) z: (0) degrees\nend\n' : 'when app run\nsay [Bonjour !] for (2) seconds\n') },
+  { label: 'Script MaxyCode', ic: 'fileCode', fn: () => newScript('Script', 'when app run\n') },
   { label: 'Dossier', ic: 'folderPlus', fn: async () => { const n = await ask('Nom du dossier', 'Nouveau dossier'); if (n) { await studio.mkdir(DIR, (S.folder ? S.folder + '/' : '') + n.replace(/[<>:"/\\|?*]/g, '')); await refreshTree(); } } }
 ]);
 // Glisser des fichiers depuis l'explorateur
@@ -874,9 +874,7 @@ async function newScript(name, code) {
   return rel;
 }
 async function newScriptFor(target) {
-  const code = S.type === '3d'
-    ? 'when app run\nprint (join [Bonjour, je suis ] (name of this object))\n\nwhen this object clicked\nset color to [#ff6680]\n'
-    : 'when app run\nsay [Bonjour !] for (2) seconds\n';
+  const code = 'when app run\n';
   const rel = await newScript(target.name || 'Script', code);
   if (!rel) return;
   snapshot();
@@ -1240,7 +1238,7 @@ const MENUS = {
   help: () => [
     { label: 'Guide de syntaxe (MAXYCODE.md)', ic: 'book', fn: () => openScript(allFiles().includes('MAXYCODE.md') ? 'MAXYCODE.md' : 'SCRATCHCODE.md') },
     { label: 'Raccourcis clavier', ic: 'list', fn: shortcutsHelp },
-    { label: 'Site ScratchCode', ic: 'external', fn: () => window.open('https://scratchcode.web.app') },
+    { label: 'Site MaxyGame', ic: 'external', fn: () => window.open('https://maxygame.web.app') },
     '-',
     { label: 'À propos de MaxyStudio', ic: 'info', fn: async () => modal('MaxyStudio', `<p class="in-note" style="font-size:13px">Version ${esc(await studio.version())}<br>Moteur 2D : Scratch 3. Moteur 3D : three.js.<br>Projets au format .maxycode.</p>`, { cancel: '' }) }
   ]

@@ -54,7 +54,7 @@
         <div class="wl-learn">
           <div class="wl-card"><b>Trois types de projets</b><p><b>2D</b> : la scène Scratch, des lutins et leurs costumes. <b>3D</b> : une scène en trois dimensions avec des objets, des lumières, une caméra, la physique et des modèles importés. <b>Application</b> : des boutons, des textes et des champs de saisie.</p></div>
           <div class="wl-card"><b>Comme dans un moteur de jeu</b><p>À gauche la <b>Hiérarchie</b> (les objets de la scène), au centre les vues <b>Scène</b> et <b>Jeu</b>, à droite l'<b>Inspecteur</b> (position, couleur, physique, script), en bas le panneau <b>Projet</b> (tes fichiers) et la <b>Console</b>. Le bouton Lecture en haut lance le jeu.</p></div>
-          <div class="wl-card"><b>Le code</b><p>Chaque objet peut avoir un script <code>.sc</code> écrit en ScratchCode. Le premier bloc d'un script est souvent <code>when app run</code>, qui remplace le drapeau vert. En 3D, de nouveaux blocs déplacent les objets : <code>move forward (0.1)</code>, <code>jump with force (6)</code>, <code>camera follow [myself] distance (7) height (3)</code>...</p></div>
+          <div class="wl-card"><b>Le code</b><p>Chaque objet peut avoir un script <code>.sc</code> écrit en MaxyCode. Le premier bloc d'un script est souvent <code>when app run</code>, qui remplace le drapeau vert. En 3D, de nouveaux blocs déplacent les objets : <code>move forward (0.1)</code>, <code>jump with force (6)</code>, <code>camera follow [myself] distance (7) height (3)</code>...</p></div>
           <div class="wl-card"><b>Importer des assets</b><p>Glisse tes fichiers dans le panneau Projet, ou clique sur Importer : modèles 3D <code>.glb</code> <code>.gltf</code> <code>.obj</code> <code>.fbx</code> <code>.stl</code> <code>.ply</code> <code>.dae</code>, images et sons. Glisse ensuite un modèle dans la vue Scène pour l'ajouter.</p></div>
           <div class="wl-card"><b>Raccourcis essentiels</b><p><kbd>Ctrl</kbd>+<kbd>P</kbd> lancer ou arrêter · <kbd>Ctrl</kbd>+<kbd>S</kbd> enregistrer · <kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler · <kbd>Ctrl</kbd>+<kbd>D</kbd> dupliquer · <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> déplacer, pivoter, redimensionner · <kbd>F</kbd> cadrer la sélection</p></div>
           <div class="wl-card"><b>Partager un projet</b><p>Fichier &gt; Exporter crée un seul fichier <code>.maxycode</code> avec tout le projet. Pour l'ouvrir sur un autre ordinateur : bouton Ouvrir, ou double-clic sur le fichier.</p></div>
@@ -172,7 +172,7 @@
         m.querySelectorAll('button').forEach(b => b.onclick = () => close(b.dataset.c));
       });
       try {
-        if (choice === 'folder') { const dir = await studio.pickFolder('Ouvrir un projet ScratchCode'); if (dir) await studio.openProject(dir); }
+        if (choice === 'folder') { const dir = await studio.pickFolder('Ouvrir un projet MaxyStudio'); if (dir) await studio.openProject(dir); }
         else if (choice === 'file') await studio.openAny();
       } catch (e) { toast(clean(e), true); }
     };
