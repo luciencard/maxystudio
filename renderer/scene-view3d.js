@@ -12,11 +12,12 @@ function iconSprite(kind) {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
   const g = c.getContext('2d');
-  g.fillStyle = kind === 'light' ? '#ffd47a' : kind === 'camera' ? '#8bc1ff' : '#c8ccd4';
+  g.fillStyle = kind === 'light' ? '#ffd47a' : kind === 'camera' ? '#8bc1ff' : kind === 'particles' ? '#ff9f4a' : '#c8ccd4';
   g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 4;
   g.beginPath();
   if (kind === 'camera') { g.roundRect(8, 18, 34, 28, 6); g.moveTo(42, 32); g.lineTo(56, 22); g.lineTo(56, 42); g.closePath(); }
   else if (kind === 'light') { g.arc(32, 28, 16, 0, Math.PI * 2); g.rect(25, 44, 14, 10); }
+  else if (kind === 'particles') { for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 9 : 22; g[i ? 'lineTo' : 'moveTo'](32 + Math.cos(a) * r, 32 + Math.sin(a) * r); } g.closePath(); }
   else { g.arc(32, 32, 12, 0, Math.PI * 2); }
   g.stroke(); g.fill();
   const tex = new THREE.CanvasTexture(c);
@@ -68,6 +69,11 @@ export class SceneView3D {
     this.box = new THREE.Box3Helper(new THREE.Box3(), 0xffa733);
     this.box.visible = false;
     this.helperRoot.add(this.box);
+    // Cercle du pinceau de sculpture du terrain
+    this.brush = new THREE.Mesh(new THREE.RingGeometry(0.94, 1, 64).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffa733, transparent: true, opacity: 0.9, depthTest: false }));
+    this.brush.renderOrder = 20; this.brush.visible = false;
+    this.helperRoot.add(this.brush);
+    this.sculpt = null; this.stroke = null; this.hover = null;
     this.viewHelper = new ViewHelper(this.camera, this.renderer.domElement);
     this.viewHelper.center = this.orbit.target;
 
@@ -92,7 +98,7 @@ export class SceneView3D {
 
   decorate(obj) {
     const def = obj.userData.def;
-    if (def.kind === 'light' || def.kind === 'camera' || def.kind === 'empty') {
+    if (def.kind === 'light' || def.kind === 'camera' || def.kind === 'empty' || def.kind === 'particles') {
       const ic = iconSprite(def.kind);
       ic.userData.owner = obj;
       obj.add(ic);
@@ -147,7 +153,45 @@ export class SceneView3D {
     else this.gizmo.detach();
   }
   setTool(t) { this.tool = t; this.applyTool(); }
+  /** Sculpture du terrain sélectionné : { tool: raise|lower|smooth|flatten, radius, strength } ou null. */
+  setSculpt(s) { this.sculpt = s; if (!s) { this.brush.visible = false; this.stroke = null; } this.applyTool(); }
+  sculptTarget() { return this.sculpt && this.selected && this.selected.userData.def.kind === 'terrain' ? this.selected : null; }
+  terrainHit(clientX, clientY) {
+    const t = this.sculptTarget();
+    if (!t) return null;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1), this.camera);
+    const h = ray.intersectObject(t, false)[0];
+    return h ? h.point : null;
+  }
+  applyBrush(dt) {
+    const obj = this.sculptTarget();
+    if (!obj || !this.stroke || !this.hover) return;
+    const def = obj.userData.def, t = def.terrain, H = core.terrainHeights(t);
+    const res = Math.round(Math.sqrt(H.length)) - 1, N = res + 1, size = +t.size || 60, step = size / res;
+    const local = obj.worldToLocal(this.hover.clone());
+    const r = Math.max(0.2, this.sculpt.radius / (Math.abs(obj.scale.x) || 1));
+    const ci = (local.x / size + 0.5) * res, cj = (local.z / size + 0.5) * res, rc = r / step;
+    const k = (this.sculpt.strength || 1) * dt, tool = this.sculpt.tool;
+    for (let j = Math.max(0, Math.floor(cj - rc)); j <= Math.min(res, Math.ceil(cj + rc)); j++) {
+      for (let i = Math.max(0, Math.floor(ci - rc)); i <= Math.min(res, Math.ceil(ci + rc)); i++) {
+        const d = Math.hypot((i - ci) * step, (j - cj) * step);
+        if (d > r) continue;
+        const w = 0.5 + 0.5 * Math.cos(Math.PI * d / r), q = j * N + i;
+        if (tool === 'raise') H[q] += 4 * k * w;
+        else if (tool === 'lower') H[q] -= 4 * k * w;
+        else if (tool === 'flatten') H[q] += (this.stroke.flat - H[q]) * Math.min(1, 6 * k * w);
+        else if (tool === 'smooth') {
+          const avg = (H[j * N + Math.max(0, i - 1)] + H[j * N + Math.min(res, i + 1)] + H[Math.max(0, j - 1) * N + i] + H[Math.min(res, j + 1) * N + i]) / 4;
+          H[q] += (avg - H[q]) * Math.min(1, 8 * k * w);
+        }
+      }
+    }
+    core.refreshTerrainGeometry(obj.geometry, t);
+  }
   applyTool() {
+    if (this.sculptTarget()) { this.gizmo.enabled = false; if (this.gizmo.getHelper) this.gizmo.getHelper().visible = false; else this.gizmo.visible = false; return; }
     if (!this.selected || this.tool === 'hand') { this.gizmo.enabled = false; if (this.gizmo.getHelper) this.gizmo.getHelper().visible = false; else this.gizmo.visible = false; return; }
     this.gizmo.enabled = true;
     if (this.gizmo.getHelper) this.gizmo.getHelper().visible = true; else this.gizmo.visible = true;
@@ -194,7 +238,14 @@ export class SceneView3D {
     this.fly(dt);
     if (this.viewHelper.animating) this.viewHelper.update(dt);
     this.orbit.update();
-    if (this.selected) { this.box.box.copy(core.worldBox(this.selected)); this.box.visible = !this.box.box.isEmpty(); }
+    core.updateEffects(this.world.scene, dt, true);
+    if (this.stroke) this.applyBrush(dt);
+    if (this.sculptTarget() && this.hover) {
+      this.brush.visible = true;
+      this.brush.position.copy(this.hover).add(new THREE.Vector3(0, 0.05, 0));
+      this.brush.scale.setScalar(this.sculpt.radius);
+    } else this.brush.visible = false;
+    if (this.selected && !this.sculptTarget()) { this.box.box.copy(core.worldBox(this.selected)); this.box.visible = !this.box.box.isEmpty(); }
     else this.box.visible = false;
     const r = this.renderer;
     const w = this.el.clientWidth, h = this.el.clientHeight;
@@ -250,7 +301,7 @@ export class SceneView3D {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(ndc, this.camera);
     const targets = [...this.world.byId.values()];
-    const hits = ray.intersectObjects(targets, true).filter(h => !(h.object.isLine || h.object.type === 'CameraHelper'));
+    const hits = ray.intersectObjects(targets, true).filter(h => !(h.object.isLine || h.object.isPoints || h.object.type === 'CameraHelper' || (h.object.parent && h.object.parent === this.brush)));
     for (const h of hits) {
       let o = h.object.userData.owner || h.object;
       while (o && !o.userData.id) o = o.parent;
@@ -266,9 +317,33 @@ export class SceneView3D {
       c.focus();
       if (e.button === 2) this.rmb = true;
       if (e.button === 0) down = { x: e.clientX, y: e.clientY };
+      if (e.button === 0 && this.sculptTarget()) {
+        const p = this.terrainHit(e.clientX, e.clientY);
+        if (p) {
+          const obj = this.sculptTarget();
+          const lp = obj.worldToLocal(p.clone());
+          this.opts.onBeforeChange && this.opts.onBeforeChange();
+          this.hover = p;
+          this.stroke = { flat: core.terrainHeightLocal(obj.userData.def.terrain, lp.x, lp.z) ?? 0 };
+          down = null;
+          c.setPointerCapture(e.pointerId);
+        }
+      }
     });
+    c.addEventListener('pointermove', e => { if (this.sculptTarget()) this.hover = this.terrainHit(e.clientX, e.clientY) || (this.stroke ? this.hover : null); });
+    c.addEventListener('pointerleave', () => { if (!this.stroke) this.hover = null; });
     addEventListener('pointerup', e => {
       if (e.button === 2) this.rmb = false;
+      if (e.button === 0 && this.stroke) {
+        this.stroke = null;
+        const obj = this.sculptTarget();
+        if (obj) {
+          const t = obj.userData.def.terrain;
+          core.setTerrainHeights(t, core.terrainHeights(t));
+          this.opts.onChange && this.opts.onChange(obj.userData.def);
+        }
+        return;
+      }
       if (e.button !== 0 || !down) return;
       const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y) > 4;
       down = null;

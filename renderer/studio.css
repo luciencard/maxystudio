@@ -278,3 +278,10 @@ body.engine-used .un-game-idle { display: none; }
 .dbg-var:hover, .dbg-line:hover { background: rgba(255,255,255,.05); }
 .dbg-line { cursor: pointer; }
 .dbg-var code, .dbg-line code { color: #ffcf3a; font-family: "JetBrains Mono", Consolas, monospace; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Terrain et particules */
+.in-sub { margin: 10px 0 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--dim, #9a9da6); }
+.in-tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.in-tools .un-btn { justify-content: center; padding-left: 4px; padding-right: 4px; }
+.in-tools .un-btn.on { background: var(--accent, #3d7bd9); border-color: var(--accent, #3d7bd9); color: #fff; }
+.un-row .oi.k-terrain { color: #7cc36a; } .un-row .oi.k-particles { color: #ff9f4a; }

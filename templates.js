@@ -162,6 +162,9 @@ const BLOCKS_3D = `
   \`unlock mouse pointer\`, \`when this object clicked\`, \`(object under mouse)\`
 - Monde : \`set sky colors top [#5d9fe8] bottom [#dcecfb]\`, \`set fog from (20) to (90)\`, \`remove fog\`, \`set sun brightness to (1.6)\`,
   \`set ambient light to (0.5)\`, \`show message [Texte]\`, \`hide message\`, \`play sound file [assets/son.mp3]\`, \`stop sound files\`, \`(delta time)\`, \`print [Texte]\`
+- Terrain : Créer > Terrain, puis sculpte-le dans l'Inspecteur (Lever, Abaisser, Lisser, Aplatir). Les objets avec la physique marchent dessus. \`(terrain height at x: (0) z: (0))\` donne la hauteur du sol.
+- Particules : Créer > Particules (feu, fumée, étincelles, pluie, neige, explosion, magie, poussière). \`start particles [Feu]\`, \`stop particles [Feu]\`, \`burst (30) particles from [Feu]\`,
+  \`set particle rate of [Feu] to (50)\`, \`create effect [explosion v] named [Boum] at x: (0) y: (1) z: (0)\` (une explosion disparaît seule quand elle est finie)
 `;
 const BLOCKS_UI = `
 ## Blocs Interface (projets Application)

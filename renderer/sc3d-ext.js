@@ -10,7 +10,7 @@
   const coreReady = Scratch.external.importModule(BASE + 'sc3d-core.js').then(m => (core = m));
 
   const W = {
-    world: null, renderer: null, canvas: null, camera: null, defaultCam: null, objects: new Map(), bodies: new Map(), mixers: new Map(),
+    world: null, renderer: null, canvas: null, camera: null, defaultCam: null, objects: new Map(), bodies: new Map(), mixers: new Map(), terrains: new Set(),
     running: false, ready: Promise.resolve(), follow: null, fps: null, keys: new Set(), mdx: 0, mdy: 0, accX: 0, accY: 0, scriptDt: 1 / 30,
     lastStep: 0, hud: null, sounds: [], underMouse: '', gravity: 9.81, project: null
   };
@@ -96,6 +96,7 @@
   function register(obj) {
     W.objects.set(obj.userData.id, obj);
     const def = obj.userData.def;
+    if (def.kind === 'terrain') W.terrains.add(obj);
     if (def.rigidbody && def.rigidbody.enabled) W.bodies.set(obj, { v: new core.THREE.Vector3(), grounded: false, gravity: +def.rigidbody.gravity || 1, bounce: +def.rigidbody.bounce || 0 });
   }
 
@@ -127,7 +128,7 @@
   function stopWorld() {
     W.running = false;
     W.follow = null; W.fps = null;
-    W.objects.clear(); W.bodies.clear();
+    W.objects.clear(); W.bodies.clear(); W.terrains.clear();
     for (const m of W.mixers.values()) m.mixer.stopAllAction();
     W.mixers.clear();
     W.sounds.forEach(a => a.pause()); W.sounds = [];
@@ -143,7 +144,7 @@
   function collidersExcept(obj) {
     const out = [];
     for (const o of W.objects.values()) {
-      if (o === obj || !o.visible || !o.userData.def.collider) continue;
+      if (o === obj || !o.visible || !o.userData.def.collider || o.userData.def.kind === 'terrain') continue;
       let p = o, related = false;
       while (p) { if (p === obj) { related = true; break; } p = p.parent; }
       p = obj; while (p) { if (p === o) { related = true; break; } p = p.parent; }
@@ -180,7 +181,30 @@
         if (body && ax === 'y' && d < 0) body.grounded = true;
       }
     }
+    groundOnTerrain(obj, body, blocked);
     return blocked;
+  }
+  // Hauteur du sol des terrains sous un point (la plus haute), ou null
+  function groundAt(x, z, except) {
+    let best = null;
+    for (const t of W.terrains) {
+      if (t === except || !t.parent || !t.visible) continue;
+      const h = core.terrainHeightWorld(t, x, z);
+      if (h != null && (best == null || h > best)) best = h;
+    }
+    return best;
+  }
+  function groundOnTerrain(obj, body, blocked) {
+    if (!W.terrains.size || W.terrains.has(obj)) return;
+    const me = core.worldBox(obj);
+    if (me.isEmpty()) return;
+    const h = groundAt((me.min.x + me.max.x) / 2, (me.min.z + me.max.z) / 2, obj);
+    if (h == null) return;
+    if (me.min.y < h - 1e-4) {
+      obj.position.y += h - me.min.y;
+      blocked.y = true;
+      if (body) body.grounded = true;
+    } else if (body && me.min.y - h < 0.03 && body.v.y <= 0) body.grounded = true;
   }
   function simulate(dt) {
     boxes.clear();
@@ -194,6 +218,13 @@
       boxes.delete(obj);
     }
     for (const m of W.mixers.values()) m.mixer.update(dt);
+    core.updateEffects(W.world.scene, dt, false);
+    for (const o of W.objects.values()) {
+      if (o.userData.def.temp && o.userData.fx && o.userData.fx.done) {
+        o.parent && o.parent.remove(o);
+        W.objects.delete(o.userData.id);
+      }
+    }
     updateCamera(dt);
   }
   function crosshair(show) {
@@ -276,7 +307,7 @@
   function addObject(def, util) {
     return W.ready.then(async () => {
       if (!W.world) return;
-      def.collider = def.collider !== false;
+      def.collider = def.kind === 'particles' ? false : def.collider !== false;
       const obj = await core.buildObject(def, resolveUrl, { onError: m => print(m, 'error') });
       W.world.scene.add(obj);
       register(obj);
@@ -314,6 +345,11 @@
     const n = Cast.toString(name).trim().toLowerCase();
     for (const [o, b] of collidersExcept(obj)) {
       if ((n === 'anything' || n === 'any' || o.name.toLowerCase() === n) && me.intersectsBox(b)) return true;
+    }
+    for (const t of W.terrains) {
+      if (t === obj || !t.visible || !t.userData.def.collider || !(n === 'anything' || n === 'any' || t.name.toLowerCase() === n)) continue;
+      const h = core.terrainHeightWorld(t, (me.min.x + me.max.x) / 2, (me.min.z + me.max.z) / 2);
+      if (h != null && me.min.y <= h + 0.06) return true;
     }
     return false;
   }
@@ -379,6 +415,12 @@
           cmd('unlockMouse', 'unlock mouse pointer'),
           { opcode: 'whenClicked', blockType: Scratch.BlockType.HAT, isEdgeActivated: false, text: 'when this object clicked' },
           rep('underMouse', 'object under mouse'),
+          cmd('startParticles', 'start particles [OBJ]', { OBJ: S('Feu') }),
+          cmd('stopParticles', 'stop particles [OBJ]', { OBJ: S('Feu') }),
+          cmd('burstParticles', 'burst [N] particles from [OBJ]', { N: N(30), OBJ: S('Feu') }),
+          cmd('particleRate', 'set particle rate of [OBJ] to [N]', { OBJ: S('Feu'), N: N(50) }),
+          cmd('createEffect', 'create effect [EFFECT] named [NAME] at x: [X] y: [Y] z: [Z]', { EFFECT: { type: Scratch.ArgumentType.STRING, menu: 'effects', defaultValue: 'explosion' }, NAME: S('Effet'), ...XYZ(0, 1, 0) }),
+          rep('terrainHeight', 'terrain height at x: [X] z: [Z]', { X: N(0), Z: N(0) }),
           cmd('sky', 'set sky colors top [TOP] bottom [BOTTOM]', { TOP: S('#5d9fe8'), BOTTOM: S('#dcecfb') }),
           cmd('fog', 'set fog from [NEAR] to [FAR]', { NEAR: N(20), FAR: N(90) }),
           cmd('fogOff', 'remove fog'),
@@ -397,7 +439,8 @@
           onoff: { acceptReporters: false, items: ['on', 'off'] },
           axes: { acceptReporters: false, items: ['horizontal', 'vertical'] },
           axes3: { acceptReporters: false, items: ['x', 'y', 'z'] },
-          xy: { acceptReporters: false, items: ['x', 'y'] }
+          xy: { acceptReporters: false, items: ['x', 'y'] },
+          effects: { acceptReporters: true, items: ['explosion', 'feu', 'fumee', 'etincelles', 'magie', 'poussiere', 'pluie', 'neige'] }
         }
       };
     }
@@ -518,6 +561,22 @@
     fogOff() { return W.ready.then(() => { if (W.world) core.applyEnvironment(W.world, { ...W.world.env, fog: { ...W.world.env.fog, enabled: false } }); }); }
     sun(a) { return W.ready.then(() => { if (W.world) core.applyEnvironment(W.world, { ...W.world.env, sun: { ...W.world.env.sun, intensity: num(a.B) } }); }); }
     ambient(a) { return W.ready.then(() => { if (W.world) core.applyEnvironment(W.world, { ...W.world.env, ambient: num(a.B) }); }); }
+    startParticles(a, u) { return withObj(a.OBJ, u, o => { const f = o.userData.fx; if (f) { f.playing = true; f.restart(); } }); }
+    stopParticles(a, u) { return withObj(a.OBJ, u, o => { const f = o.userData.fx; if (f) f.playing = false; }); }
+    burstParticles(a, u) { return withObj(a.OBJ, u, o => { const f = o.userData.fx; if (f) f.burst(Math.max(0, Math.min(3000, Math.round(num(a.N)))), o); }); }
+    particleRate(a, u) { return withObj(a.OBJ, u, o => { const f = o.userData.fx; if (f) f.cfg.rate = Math.max(0, num(a.N)); }); }
+    createEffect(a) {
+      return coreReady.then(() => {
+        const p = core.particlePreset(Cast.toString(a.EFFECT));
+        const def = core.defaultObject('particles', Cast.toString(a.NAME) || 'Effet', { particles: p, position: [num(a.X), num(a.Y), num(a.Z)] });
+        def.temp = p.loop === false;
+        return addObject(def);
+      });
+    }
+    terrainHeight(a) {
+      const calc = () => { const h = groundAt(num(a.X), num(a.Z), null); return h == null ? 0 : Math.round(h * 1000) / 1000; };
+      return W.world ? calc() : W.ready.then(calc);
+    }
     message(a) { const h = hud(); h.textContent = Cast.toString(a.TEXT); h.style.display = h.textContent ? 'block' : 'none'; }
     hideMessage() { if (W.hud) W.hud.style.display = 'none'; }
     playFile(a) { const s = new Audio(resolveUrl(Cast.toString(a.ASSET))); W.sounds.push(s); s.play().catch(() => print('Son introuvable : ' + a.ASSET, 'error')); s.onended = () => { W.sounds = W.sounds.filter(x => x !== s); }; }

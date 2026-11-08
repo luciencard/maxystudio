@@ -22,7 +22,7 @@ const S = {
   config: null, type: '2d', tree: [], base: '', scenePath: 'scenes/Main.scene', scene: null,
   sel: null, selAsset: null, mode: 'edit', paused: false, undo: [], redo: [], lastSnap: { key: '', t: 0 },
   models: new Map(), saved: new Map(), tabs: ['scene', 'game'], active: 'scene', folder: 'assets',
-  folderOpen: new Set(['', 'assets', 'scripts', 'scenes']), collapsed: new Set(), closedComps: new Set(),
+  folderOpen: new Set(['', 'assets', 'scripts', 'scenes']), collapsed: new Set(), closedComps: new Set(), sculpt: { tool: null, radius: 4, strength: 1 },
   logs: [], levels: { log: true, warn: true, error: true }, collapse: false, clearOnPlay: true, problems: {}
 };
 let view = null, monaco = null, editor = null;
@@ -168,6 +168,7 @@ function uniqueName(name, exceptId) {
 
 // ---------------- Sélection ----------------
 function select(id, { fromView } = {}) {
+  if (S.sculpt.tool && id !== S.sel) setSculpt(null, false);
   S.sel = id;
   S.selAsset = null;
   view.select(id && id[0] !== '_' ? id : null);
@@ -196,9 +197,10 @@ async function createObject(kind, extra = {}, parent = null) {
   snapshot();
   let def;
   if (S.type === '3d') {
-    const label = { empty: 'Objet vide', light: 'Lumière', camera: 'Caméra', model: 'Modèle' }[kind] || core.SHAPE_NAMES[kind] || kind;
+    const label = { empty: 'Objet vide', light: 'Lumière', camera: 'Caméra', model: 'Modèle', terrain: 'Terrain', particles: 'Particules' }[kind] || core.SHAPE_NAMES[kind] || kind;
     const spawn = spawnPoint();
     if (kind === 'plane' || kind === 'model') spawn[1] = 0;
+    if (kind === 'terrain') { spawn[0] = 0; spawn[1] = 0; spawn[2] = 0; }
     def = core.defaultObject(kind, uniqueName(extra.name || label), Object.assign({ position: spawn }, extra));
     def.name = uniqueName(def.name);
     def.parent = parent;
@@ -297,13 +299,15 @@ function applyChange(target, path, value, how) {
   else if (how === 'rebuild' || how === 'rebuild+insp') view.updateObject(target);
   else if (how === 'name') { target.name = uniqueName(String(value).trim() || 'Objet', target.id); view.updateObject(target); renderHier(); }
   else if (how === 'draw') view.updateObject(target);
+  else if (how === 'terrainGen') { core.generateTerrain(target.terrain); view.updateObject(target); }
+  else if (how === 'particlePreset') { Object.assign(target.particles, core.particlePreset(value)); view.updateObject(target); renderInsp(); }
   if (how === 'rebuild+insp') renderInsp();
   if (path === 'active' || path === 'visible') renderHier();
   saveScene();
 }
 
 // ---------------- Hiérarchie ----------------
-const OBJ_ICON = { empty: 'empty', cube: 'box', sphere: 'sphere', cylinder: 'box', cone: 'box', capsule: 'box', plane: 'grid', torus: 'sphere', model: 'box', light: 'light', camera: 'camera', sprite: 'sprite' };
+const OBJ_ICON = { terrain: 'mountain', particles: 'sparkles', empty: 'empty', cube: 'box', sphere: 'sphere', cylinder: 'box', cone: 'box', capsule: 'box', plane: 'grid', torus: 'sphere', model: 'box', light: 'light', camera: 'camera', sprite: 'sprite' };
 function renderHier() {
   const box = $('#hier');
   if (!S.scene) { box.innerHTML = ''; return; }
@@ -383,7 +387,13 @@ function createItems(parent = null) {
     { label: 'Projecteur', ic: 'light', fn: () => createObject('light', { name: 'Projecteur', light: { type: 'spot', color: '#ffffff', intensity: 4, range: 20 } }, parent) },
     { label: 'Lumière directionnelle', ic: 'sun', fn: () => createObject('light', { name: 'Lumière directionnelle', light: { type: 'directional', color: '#ffffff', intensity: 1 } }, parent) },
     '-', { label: 'Caméra', ic: 'camera', fn: () => createObject('camera', { camera: { fov: 60, main: !S.scene.objects.some(o => o.kind === 'camera') } }, parent) },
-    { label: 'Modèle 3D (depuis les assets)…', ic: 'box', fn: pickModel }
+    { label: 'Modèle 3D (depuis les assets)…', ic: 'box', fn: pickModel },
+    '-', 'Monde', { label: 'Terrain', ic: 'mountain', fn: () => createObject('terrain', {}, parent) },
+    '-', 'Particules', ...Object.entries(core.PARTICLE_NAMES).map(([k, l]) => ({ label: l, ic: 'sparkles', fn: () => {
+      const extra = { name: l, particles: core.particlePreset(k) };
+      if (k === 'pluie' || k === 'neige') { const p = spawnPoint(); p[1] = 10; extra.position = p; }
+      return createObject('particles', extra, parent);
+    } }))
   ];
 }
 async function pickModel() {
@@ -466,6 +476,48 @@ function renderObj3D(box, o) {
       ${lbl('Couleur')}${color('light.color', l.color)}${lbl('Intensité', 'light.intensity', 0.05)}${num('light.intensity', l.intensity, 0.1)}
       ${l.type !== 'directional' ? lbl('Portée', 'light.range', 0.1) + num('light.range', l.range, 0.5) : ''}${lbl('Ombres')}${check('light.shadows', l.shadows)}`);
   }
+  if (o.kind === 'terrain') {
+    const t = o.terrain, c = t.colors || {}, lv = t.levels || {};
+    const tools = [['raise', 'Lever'], ['lower', 'Abaisser'], ['smooth', 'Lisser'], ['flatten', 'Aplatir']];
+    html += comp('terrain', 'mountain', 'Terrain', `${lbl('Relief')}${selectF('terrain.preset', t.preset, core.TERRAIN_PRESETS)}
+      ${lbl('Graine', 'terrain.seed', 0.2)}<div class="in-row2">${num('terrain.seed', t.seed, 1)}<button class="un-btn sm" data-act="terrainSeed" title="Un autre relief du même type">${icon('refresh', 12)}Autre</button></div>
+      ${lbl('Hauteur', 'terrain.height', 0.05)}${num('terrain.height', t.height, 0.5)}
+      ${lbl('Taille', 'terrain.size', 0.2)}${num('terrain.size', t.size, 1)}
+      ${lbl('Détail')}${selectF('terrain.res', t.res, [[48, 'Bas'], [96, 'Moyen'], [144, 'Élevé']])}
+      <div class="full in-note">Changer le relief, la graine ou la hauteur recrée le terrain (Ctrl+Z pour revenir en arrière).</div>
+      <div class="full in-sub">Sculpter</div>
+      <div class="full in-tools">${tools.map(([k, l]) => `<button class="un-btn sm${S.sculpt.tool === k ? ' on' : ''}" data-sculpt="${k}">${l}</button>`).join('')}</div>
+      ${lbl('Rayon')}<div class="in-row2"><input type="range" data-brush="radius" min="1" max="20" step="0.5" value="${S.sculpt.radius}"><span class="in-l" style="width:34px;text-align:right" data-bout="radius">${fmt(S.sculpt.radius)}</span></div>
+      ${lbl('Force')}<div class="in-row2"><input type="range" data-brush="strength" min="0.1" max="3" step="0.1" value="${S.sculpt.strength}"><span class="in-l" style="width:34px;text-align:right" data-bout="strength">${fmt(S.sculpt.strength)}</span></div>
+      <div class="full in-note">${S.sculpt.tool ? 'Clique et glisse sur le terrain dans la vue Scène. Échap pour arrêter de sculpter.' : 'Choisis un outil, puis peins le relief dans la vue Scène.'}</div>
+      <div class="full in-sub">Couleurs</div>
+      ${lbl('Sable')}${color('terrain.colors.sand', c.sand)}${lbl('Herbe')}${color('terrain.colors.grass', c.grass)}
+      ${lbl('Roche')}${color('terrain.colors.rock', c.rock)}${lbl('Neige')}${color('terrain.colors.snow', c.snow)}
+      ${lbl('Niveau du sable', 'terrain.levels.sand', 0.02)}${num('terrain.levels.sand', lv.sand ?? 0.4, 0.1)}
+      ${lbl('Niveau de la neige', 'terrain.levels.snow', 0.05)}${num('terrain.levels.snow', lv.snow ?? 12, 0.5)}
+      <div class="full in-note">Les objets avec la physique marchent sur le relief. Bloc : <code>(terrain height at x: (0) z: (0))</code>.</div>`);
+  }
+  if (o.kind === 'particles') {
+    const p = o.particles;
+    html += comp('particles', 'sparkles', 'Particules', `${lbl('Préréglage')}${selectF('particles.preset', p.preset || '', [['', '(personnalisé)'], ...Object.entries(core.PARTICLE_NAMES)])}
+      ${lbl('Lecture')}<div class="in-row2">${check('particles.playing', p.playing !== false, 'Au démarrage')}${check('particles.loop', p.loop !== false, 'En boucle')}</div>
+      ${lbl('Par seconde', 'particles.rate', 0.5)}${num('particles.rate', p.rate, 1)}
+      ${lbl('Rafale', 'particles.burst', 0.5)}${num('particles.burst', p.burst || 0, 1)}
+      ${lbl('Durée de vie', 'particles.life', 0.02)}${num('particles.life', p.life, 0.1)}
+      ${lbl('Vitesse', 'particles.speed', 0.05)}${num('particles.speed', p.speed, 0.1)}
+      ${lbl('Direction')}${selectF('particles.dir', p.dir || 'up', [['up', 'Vers le haut'], ['down', 'Vers le bas']])}
+      ${lbl('Dispersion')}${range('particles.spread', p.spread, 0, 180, 1)}
+      ${lbl('Taille au début', 'particles.size', 0.01)}${num('particles.size', p.size, 0.05)}
+      ${lbl('Taille à la fin', 'particles.sizeEnd', 0.01)}${num('particles.sizeEnd', p.sizeEnd ?? p.size, 0.05)}
+      ${lbl('Couleur au début')}${color('particles.color', p.color)}${lbl('Couleur à la fin')}${color('particles.colorEnd', p.colorEnd || p.color)}
+      ${lbl('Opacité')}${range('particles.opacity', p.opacity ?? 1, 0, 1, 0.01)}
+      ${lbl('Gravité', 'particles.gravity', 0.05)}${num('particles.gravity', p.gravity || 0, 0.1)}
+      ${lbl('Freinage', 'particles.drag', 0.02)}${num('particles.drag', p.drag || 0, 0.1)}
+      ${lbl('Forme')}${selectF('particles.shape', p.shape || 'point', [['point', 'Point'], ['sphere', 'Sphère'], ['disc', 'Disque'], ['box', 'Zone carrée']])}
+      ${lbl('Rayon', 'particles.radius', 0.05)}${num('particles.radius', p.radius || 0, 0.1)}
+      ${lbl('Rendu')}${selectF('particles.blend', p.blend || 'normal', [['add', 'Lumineux'], ['normal', 'Normal']])}
+      <div class="full in-note">Une gravité négative fait monter les particules (feu, fumée). Blocs : <code>start particles [${esc(o.name)}]</code>, <code>burst (30) particles from [${esc(o.name)}]</code>.</div>`);
+  }
   if (o.kind === 'camera') {
     html += comp('camera', 'camera', 'Caméra', `${lbl('Champ de vision')}${range('camera.fov', o.camera.fov, 20, 120, 1)}${lbl('Principale')}${check('camera.main', o.camera.main, 'Le jeu utilise cette caméra')}`);
   }
@@ -476,7 +528,14 @@ function renderObj3D(box, o) {
   if (o.script) html += scriptComp(o);
   html += `<div class="in-add"><button class="un-btn" data-act="addComp">${icon('plus', 13)}Ajouter un composant</button></div>`;
   box.innerHTML = html;
-  bindInsp(box, o, k => /^(position|rotation|scale)\./.test(k) ? 'transform' : k === 'name' ? 'name' : (k === 'kind' || k === 'light.type' || k === 'model') ? 'rebuild+insp' : 'rebuild');
+  bindInsp(box, o, k => /^(position|rotation|scale)\./.test(k) ? 'transform' : k === 'name' ? 'name' : (k === 'kind' || k === 'light.type' || k === 'model') ? 'rebuild+insp'
+    : (k === 'terrain.preset' || k === 'terrain.seed' || k === 'terrain.height') ? 'terrainGen' : k === 'particles.preset' ? 'particlePreset' : 'rebuild');
+  box.querySelectorAll('[data-sculpt]').forEach(b => b.onclick = () => setSculpt(S.sculpt.tool === b.dataset.sculpt ? null : b.dataset.sculpt));
+  box.querySelectorAll('[data-brush]').forEach(r => r.oninput = () => {
+    S.sculpt[r.dataset.brush] = +r.value;
+    box.querySelector(`[data-bout="${r.dataset.brush}"]`).textContent = fmt(+r.value);
+    if (S.sculpt.tool) view.setSculpt({ ...S.sculpt });
+  });
 }
 function renderSprite(box, o) {
   const thumbs = (list, kind) => `<div class="full in-list">${list.map((rel, i) => `<div class="in-item">${kind === 'image' ? `<img src="${esc(resolveUrl(rel))}" alt="">` : `<span style="flex:none;color:#ff9f6b">${icon('volume', 18)}</span>`}<span title="${esc(rel)}">${esc(base(rel))}</span>
@@ -596,6 +655,7 @@ function bindInsp(root, target, howOf, scope) {
   act('openScript', () => target.script && openScript(target.script));
   act('newScript', () => newScriptFor(target));
   act('prefabApply', () => applyPrefab(target.id));
+  act('terrainSeed', () => { snapshot(); target.terrain.seed = Math.floor(Math.random() * 99999); core.generateTerrain(target.terrain); view.updateObject(target); saveScene(); renderInsp(); });
   act('prefabUpdate', () => updateInstances(target.prefab));
   act('prefabDetach', () => detachPrefab(target.id));
   act('addComp', e => menuAt(e.currentTarget, [
@@ -1276,6 +1336,14 @@ function detachPrefab(id) {
 }
 
 
+// ---------------- Sculpture du terrain ----------------
+function setSculpt(tool, render = true) {
+  S.sculpt.tool = tool || null;
+  if (view && view.setSculpt) view.setSculpt(tool ? { ...S.sculpt } : null);
+  if (tool) { activateTab('scene'); status('Sculpture : clique et glisse sur le terrain. Échap pour arrêter.'); }
+  if (render) renderInsp();
+}
+
 // ---------------- Débogueur : points d'arrêt, pas à pas, variables, profileur ----------------
 const DBG = { on: false, bps: new Map(), decos: new Map(), stepping: false, pausedAt: null, resume: null, hits: new Map(), pauseDeco: [], timer: null, frames: 0, fps: 0, lastHits: 0, lps: 0 };
 const countBreakpoints = () => [...DBG.bps.values()].reduce((a, set) => a + set.size, 0);
@@ -1657,6 +1725,7 @@ $('#projBtn').onclick = async e => {
 const typing = e => { const t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable || (t.closest && t.closest('#monaco'))); };
 window.addEventListener('keydown', e => {
   if ($('#modalBack').classList.contains('show')) return;
+  if (e.key === 'Escape' && S.sculpt.tool) { e.preventDefault(); setSculpt(null); return; }
   if (e.key === 'F5' && !e.ctrlKey) { e.preventDefault(); e.stopPropagation(); if (S.mode === 'edit') play(true); return; }
   if (e.key === 'F8' && DBG.resume) { e.preventDefault(); e.stopPropagation(); debugContinue(false); return; }
   if (e.key === 'F10' && DBG.resume) { e.preventDefault(); e.stopPropagation(); debugContinue(true); return; }
@@ -1740,7 +1809,7 @@ const BLOCKS_3D = [
   'set color to [#ff6680]', 'set opacity to (50) %', 'set texture to [assets/texture.png]', 'show object [myself]', 'hide object [myself]', 'play animation [Walk]', 'play animation [Jump] once', 'stop animations', '(animations of this object)',
   'create [cube v] named [Caisse] at x: (0) y: (3) z: (0)', 'create model [assets/modele.glb] named [Modèle] at x: (0) y: (0) z: (0)', 'clone object [myself] as [Copie]', 'delete object [Copie]', '<object [Copie] exists?>', '(name of this object)',
   'turn physics [on v]', 'set velocity to x: (0) y: (0) z: (0)', 'change velocity by x: (0) y: (5) z: (0)', 'jump with force (6)', 'set world gravity to (9.81)', '<on ground?>', '<touching object [anything]?>', 'when this object touches [Joueur]', '([y v] velocity)',
-  'camera follow [myself] distance (7) height (3)', 'first person camera on [myself] eye height (1.6)', 'set camera position to x: (0) y: (4) z: (9)', 'point camera at x: (0) y: (0) z: (0)', 'set camera field of view to (60)', 'stop camera follow',
+  'camera follow [myself] distance (7) height (3)', 'first person camera on [myself] eye height (1.6)', 'set camera position to x: (0) y: (4) z: (9)', 'point camera at x: (0) y: (0) z: (0)', 'set camera field of view to (60)', 'stop camera follow', 'start particles [Feu]', 'stop particles [Feu]', 'burst (30) particles from [Feu]', 'set particle rate of [Feu] to (50)', 'create effect [explosion v] named [Boum] at x: (0) y: (1) z: (0)', '(terrain height at x: (0) z: (0))',
   '(axis [horizontal v])', '(axis [vertical v])', '(mouse movement [x v])', 'lock mouse pointer', 'unlock mouse pointer', 'when this object clicked', '(object under mouse)',
   'set sky colors top [#5d9fe8] bottom [#dcecfb]', 'set fog from (20) to (90)', 'remove fog', 'set sun brightness to (1.6)', 'set ambient light to (0.5)', 'show message [Bienvenue !]', 'hide message',
   'play sound file [assets/son.mp3]', 'stop sound files', '(delta time)', 'print [Bonjour]'
@@ -1763,7 +1832,7 @@ function setupMonaco() {
         [/^\s*return\b/, 'hat'],
         [/^\s*import\b.*$/, 'hat'],
         [/\b(forever|repeat until|repeat|if|then|else|end|wait until|wait|stop|create clone of|delete this clone|broadcast and wait|broadcast)\b/, 'control'],
-        [/\b(set position|change position|move forward|move sideways|rotate by|set rotation|look at|set scale|set color|set opacity|set texture|show object|hide object|play animation|stop animations|create|clone object|delete object|turn physics|set velocity|change velocity|jump with force|set world gravity|camera follow|first person camera|set camera|point camera|stop camera follow|lock mouse pointer|unlock mouse pointer|set sky colors|set fog|remove fog|set sun brightness|set ambient light|show message|hide message|play sound file|stop sound files|print|add title|add label|add button|add text field|add image|set text of|remove element|clear interface|arrange elements|set app background|show notification)\b/, 'engine'],
+        [/\b(set position|change position|move forward|move sideways|rotate by|set rotation|look at|set scale|set color|set opacity|set texture|show object|hide object|play animation|stop animations|create|clone object|delete object|turn physics|set velocity|change velocity|jump with force|set world gravity|camera follow|first person camera|start particles|stop particles|burst|set particle rate|create effect|terrain height at|set camera|point camera|stop camera follow|lock mouse pointer|unlock mouse pointer|set sky colors|set fog|remove fog|set sun brightness|set ambient light|show message|hide message|play sound file|stop sound files|print|add title|add label|add button|add text field|add image|set text of|remove element|clear interface|arrange elements|set app background|show notification)\b/, 'engine'],
         [/\b(set|change|go to|glide|move|turn|point in direction|point towards|say|think|show|hide|switch costume to|next costume|play sound|start sound|add|delete|insert|replace)\b/, 'action'],
         [/\[[^\]]*\]/, 'string'],
         [/\(\s*-?\d+(\.\d+)?\s*\)/, 'number'],
