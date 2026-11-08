@@ -3,7 +3,7 @@ import * as core from './sc3d-core.js';
 import { SceneView3D } from './scene-view3d.js';
 import { SceneView2D } from './scene-view2d.js';
 import { initPlugins } from './plugins.js';
-import { compileMaxyCode, originalLine } from './maxycode.js';
+import { compileMaxyCode, originalLine, originOf, findImports, STDLIB } from './maxycode.js';
 
 hydrateIcons();
 const $ = s => document.querySelector(s);
@@ -1150,9 +1150,24 @@ async function play() {
     S.problems = {};
     const compile = async (target, rel) => {
       // MaxyCode (fonctions qui renvoient une valeur…) est d'abord traduit en blocs Scratch ; les erreurs gardent les lignes d'origine.
-      const mc = compileMaxyCode(await readScript(rel));
+      const src = await readScript(rel);
+      // Modules importés (scripts du projet) : lus d'avance, avec leurs propres imports
+      const mods = {};
+      const load = async text => {
+        for (const name of findImports(text)) {
+          if (name in mods || STDLIB[name] != null) continue;
+          mods[name] = allFiles().includes(name) ? await readScript(name) : null;
+          if (mods[name]) await load(mods[name]);
+        }
+      };
+      await load(src);
+      const mc = compileMaxyCode(src, { resolve: name => mods[name] ?? null });
       const list = (await sc.setCode(target, mc.code)) || [];
-      const errs = [...mc.errors, ...list.map(e => ({ line: originalLine(mc, Number(e.line ?? e.lineNumber ?? (e.from && e.from.line) ?? 1) || 1), message: String(e.message ?? e.msg ?? e) }))];
+      const errs = [...mc.errors, ...list.map(e => {
+        const raw = Number(e.line ?? e.lineNumber ?? (e.from && e.from.line) ?? 1) || 1;
+        const from = originOf(mc, raw);
+        return { line: originalLine(mc, raw), message: (from ? `[${from}] ` : '') + String(e.message ?? e.msg ?? e) };
+      })];
       if (rel) S.problems[rel] = (S.problems[rel] || []).concat(errs);
       for (const e of errs) { errors++; log('error', e.message, { loc: { rel, line: e.line } }); }
     };
@@ -1444,6 +1459,7 @@ function setupMonaco() {
         [/\/\/.*$/, 'comment'],
         [/^\s*(when|define!?)\b.*$/, 'hat'],
         [/^\s*return\b/, 'hat'],
+        [/^\s*import\b.*$/, 'hat'],
         [/\b(forever|repeat until|repeat|if|then|else|end|wait until|wait|stop|create clone of|delete this clone|broadcast and wait|broadcast)\b/, 'control'],
         [/\b(set position|change position|move forward|move sideways|rotate by|set rotation|look at|set scale|set color|set opacity|set texture|show object|hide object|play animation|stop animations|create|clone object|delete object|turn physics|set velocity|change velocity|jump with force|set world gravity|camera follow|first person camera|set camera|point camera|stop camera follow|lock mouse pointer|unlock mouse pointer|set sky colors|set fog|remove fog|set sun brightness|set ambient light|show message|hide message|play sound file|stop sound files|print|add title|add label|add button|add text field|add image|set text of|remove element|clear interface|arrange elements|set app background|show notification)\b/, 'engine'],
         [/\b(set|change|go to|glide|move|turn|point in direction|point towards|say|think|show|hide|switch costume to|next costume|play sound|start sound|add|delete|insert|replace)\b/, 'action'],
