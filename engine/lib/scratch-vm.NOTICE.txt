@@ -1,0 +1,9 @@
+scratch-vm.js, extension worker.js, iframe-extension-worker.js, js/ et media/music/
+
+Machine virtuelle TurboWarp (fork de scratch-vm de la Scratch Foundation), avec son compilateur.
+Licence : Mozilla Public License 2.0 (texte complet dans scratch-vm.LICENSE.txt).
+Code source : https://github.com/TurboWarp/scratch-vm (branche develop, commit 0cb82af).
+Ces fichiers sont construits à partir de ce code sans modification : seule la configuration
+de construction diffère (version navigateur uniquement, chemin /lib/), et un petit fichier
+d'entrée expose aussi ArgumentType et BlockType, comme scratch-vm d'origine.
+Les sons de l'extension Musique viennent du même dépôt (src/extensions/scratch3_music/assets).
