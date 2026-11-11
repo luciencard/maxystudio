@@ -1096,6 +1096,9 @@ function showBottom(tab) {
   $('#consoleTools').hidden = tab !== 'console';
   $('#libTools').hidden = tab !== 'library';
   $('#animView').hidden = tab !== 'anim';
+  $('#aiView').hidden = tab !== 'maxyai';
+  $('#aiTools').hidden = tab !== 'maxyai';
+  if (tab === 'maxyai') openMaxyAi();
   $('#animTools').hidden = tab !== 'anim';
   if (anim) { if (tab === 'anim') { anim.render(); anim.apply(); } else { anim.stop(); anim.restore(); } }
   if (tab === 'console') renderConsole();
@@ -1383,6 +1386,17 @@ function detachPrefab(id) {
 
 
 // ---------------- Assistants IA (MCP) ----------------
+/** Un assistant vient peut-être d'écrire sur le disque : on relit scène et scripts avant de lancer (sinon l'ancienne copie en mémoire serait réenregistrée). */
+async function syncFromDisk() {
+  await refreshTree();
+  for (const [rel, m] of S.models) {
+    if (isDirty(rel)) continue;
+    try { const t = await studio.readFile(DIR, rel); if (t !== m.getValue()) { m.setValue(t); S.saved.set(rel, t); } } catch { /* fichier supprimé */ }
+  }
+  if (S.mode === 'edit') {
+    try { const disk = await studio.readFile(DIR, S.scenePath); if (disk !== JSON.stringify(S.scene, null, 2)) await loadScene(); } catch { /* scène illisible */ }
+  }
+}
 // Claude Desktop, Codex (ChatGPT) et Antigravity (Gemini) pilotent MaxyStudio par mcp-server.js.
 const fmtLog = l => `[${l.level}]${l.who ? ' ' + l.who + ' :' : ''} ${l.text}${l.loc ? ` (${l.loc.rel}, ligne ${l.loc.line})` : ''}`;
 if (studio.ai) studio.ai.onRequest(async (id, method, params) => {
@@ -1396,6 +1410,7 @@ if (studio.ai) studio.ai.onRequest(async (id, method, params) => {
       out = { rect: { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }, view: S.mode !== 'edit' ? 'Vue Jeu (jeu en cours)' : 'Vue Scène (jeu arrêté)' };
     } else if (method === 'play') {
       if (S.mode !== 'edit') stop();
+      await syncFromDisk();
       // La console peut être vidée au lancement : on repère la dernière ligne d'avant
       const mark = S.logs[S.logs.length - 1];
       await play();
@@ -1416,10 +1431,12 @@ async function aiDialog() {
   const list = await studio.ai.list();
   const row = a => `<div class="ai-row"><div><b>${esc(a.label)}</b><span>${!a.installed ? 'Pas installé sur cet ordinateur' : a.connected ? 'Connecté à MaxyStudio' : 'Installé, pas encore connecté'}</span></div>
     ${a.installed ? (a.connected ? `<button class="un-btn sm" data-aioff="${a.id}">Déconnecter</button>` : `<button class="un-btn sm primary" data-aion="${a.id}">Connecter</button>`) : ''}</div>`;
-  const p = modal('Assistants IA', `<p class="m-note" style="margin-top:0">Connecte ton assistant : il pourra lire et modifier tes scripts et tes scènes, lancer le jeu, lire la console et voir une capture du jeu. Il utilise ton abonnement à cet assistant ; MaxyStudio n'envoie rien ailleurs.</p>
-    <div class="ai-list">${list.map(row).join('')}</div>
-    <p class="m-note">Après « Connecter », redémarre l'assistant, puis demande-lui par exemple : « Dans MaxyStudio, ajoute un ennemi qui suit le joueur ». MaxyStudio doit rester ouvert pour lancer le jeu et faire des captures.</p>
-    <p class="m-note">Autre outil compatible MCP (VS Code, Cursor…) : <a href="#" id="aiCopy">copier la configuration</a>.</p>`, { ok: 'Fermer', cancel: '' });
+  const groups = [...new Set(list.map(a => a.group))];
+  const p = modal('Serveur MCP de MaxyStudio', `<p class="m-note" style="margin-top:0">Connecte un assistant IA à MaxyStudio : il pourra lire et modifier tes scripts et tes scènes, ajouter des objets, importer des assets de la bibliothèque, lancer le jeu, lire la console et voir une capture du jeu. Il utilise ton propre compte ; MaxyStudio n'envoie rien ailleurs.</p>
+    ${groups.map(g => `<div class="ai-group">${esc(g)}</div><div class="ai-list">${list.filter(a => a.group === g).map(row).join('')}</div>`).join('')}
+    <p class="m-note">Claude Code (application) et Claude Code CLI partagent le même réglage : en connecter un connecte les deux.</p>
+    <p class="m-note">Après « Connecter », ouvre une nouvelle session de l'assistant, puis demande-lui par exemple : « Dans MaxyStudio, ajoute un ennemi qui suit le joueur ». MaxyStudio doit rester ouvert pour lancer le jeu et faire des captures.</p>
+    <p class="m-note">Autre outil compatible MCP : <a href="#" id="aiCopy">copier la configuration</a>.</p>`, { ok: 'Fermer', cancel: '' });
   const body = $('#modalBody');
   body.querySelectorAll('[data-aion]').forEach(b => b.onclick = async () => {
     try { const r = await studio.ai.connect(b.dataset.aion); toast(`${r.label} est connecté. ${r.note}`); $('#modalOk').click(); aiDialog(); }
@@ -1432,6 +1449,103 @@ async function aiDialog() {
   if (cp) cp.onclick = async e => { e.preventDefault(); await navigator.clipboard.writeText(await studio.ai.config()); toast('Configuration MCP copiée.'); };
   return p;
 }
+
+
+// ---------------- Maxy AI (assistant intégré) ----------------
+const AI = { settings: null, busy: false, bot: null, text: '' };
+function mdLite(t) {
+  // Texte sûr : échappé, puis blocs de code, code en ligne et gras
+  let h = esc(t);
+  h = h.replace(/```[a-z]*\n?([\s\S]*?)```/g, (_m, c) => `<pre>${c.replace(/\n$/, '')}</pre>`);
+  h = h.replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+  return h;
+}
+function aiAdd(cls, html) {
+  const log = $('#aiLog');
+  const el = document.createElement('div');
+  el.className = cls; el.innerHTML = html;
+  log.appendChild(el); log.scrollTop = log.scrollHeight;
+  return el;
+}
+function aiBusy(on) {
+  AI.busy = on;
+  $('#aiSend').textContent = on ? 'Arrêter' : 'Envoyer';
+  $('#aiSend').classList.toggle('primary', !on);
+}
+async function openMaxyAi() {
+  if (!studio.maxyai) { $('#aiLog').innerHTML = '<p class="ai-setup">Maxy AI est disponible dans l\u2019application MaxyStudio pour ordinateur.</p>'; return; }
+  AI.settings = await studio.maxyai.settings();
+  const sel = $('#aiModel');
+  sel.innerHTML = Object.entries(AI.settings.models).map(([id, l]) => `<option value="${id}"${id === AI.settings.model ? ' selected' : ''}>${esc(l)}</option>`).join('');
+  $('#aiEffort').value = AI.settings.effort;
+  if (!AI.settings.hasKey) return aiSetup();
+  if (!$('#aiLog').children.length || $('#aiLog .ai-setup')) {
+    $('#aiLog').innerHTML = '';
+    aiAdd('ai-msg bot', mdLite("Bonjour ! Je suis **Maxy AI**. Je peux écrire tes scripts (MaxyCode ou JavaScript), ajouter des objets et des assets de la bibliothèque, lancer le jeu, lire les erreurs et les corriger. Qu'est-ce qu'on crée ?"));
+  }
+  setTimeout(() => $('#aiText').focus(), 50);
+}
+function aiSetup() {
+  $('#aiLog').innerHTML = `<div class="ai-setup"><b>Maxy AI utilise Claude, l'IA d'Anthropic.</b><br>
+    Pour l'activer, colle ta clé API Anthropic. Elle reste sur cet ordinateur, chiffrée par le système, et n'est envoyée qu'à Anthropic.
+    Les réponses sont facturées sur ton compte de la plateforme Anthropic, selon le modèle choisi (un abonnement Claude Pro ne suffit pas : c'est un compte séparé).
+    <div class="row"><input type="password" id="aiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false"><button class="un-btn primary" id="aiKeySave">Enregistrer</button></div>
+    <a href="#" id="aiKeyGet">Créer une clé API sur platform.claude.com</a>${AI.settings && AI.settings.hasKey ? ' · <a href="#" id="aiKeyDel">Supprimer la clé enregistrée</a>' : ''}</div>`;
+  $('#aiKeyGet').onclick = e => { e.preventDefault(); studio.openExternal('https://platform.claude.com/'); };
+  const del = $('#aiKeyDel');
+  if (del) del.onclick = async e => { e.preventDefault(); AI.settings = await studio.maxyai.setKey(''); toast('Clé supprimée.'); aiSetup(); };
+  $('#aiKeySave').onclick = async () => {
+    const k = $('#aiKey').value.trim();
+    if (!k) return;
+    $('#aiKeySave').disabled = true; $('#aiKeySave').textContent = 'Vérification…';
+    try { AI.settings = await studio.maxyai.setKey(k); toast('Clé enregistrée : Maxy AI est prêt.'); $('#aiLog').innerHTML = ''; openMaxyAi(); }
+    catch (e) { toast(cleanErr(e), true); $('#aiKeySave').disabled = false; $('#aiKeySave').textContent = 'Enregistrer'; }
+  };
+}
+async function aiSend() {
+  if (AI.busy) { studio.maxyai.stop(); return; }
+  const text = $('#aiText').value.trim();
+  if (!text) return;
+  $('#aiText').value = '';
+  aiAdd('ai-msg user', esc(text));
+  AI.bot = null; AI.text = '';
+  aiBusy(true);
+  await saveAll();
+  const o = findObj(S.sel);
+  const context = { scene: S.scenePath, selected: o && o.name, file: S.active && !FIXED_TABS.includes(S.active) ? S.active : null };
+  try { await studio.maxyai.send(text, context); }
+  catch (e) { aiAdd('ai-err', esc(cleanErr(e))); aiBusy(false); }
+}
+const TOOL_LABEL = { maxystudio_status: 'Regarde MaxyStudio', get_guide: 'Lit le guide', get_project: 'Regarde le projet', list_files: 'Liste les fichiers', read_file: 'Lit', write_file: 'Écrit', create_script: 'Crée le script', add_object: 'Ajoute', update_object: 'Modifie', remove_object: 'Supprime', create_scene: 'Crée la scène', search_library: 'Cherche dans la bibliothèque', import_library_asset: 'Importe', run_game: 'Lance le jeu', stop_game: 'Arrête le jeu', get_console: 'Lit la console', screenshot: 'Regarde le jeu' };
+if (studio.maxyai) studio.maxyai.onEvent(ev => {
+  if (ev.type === 'text') {
+    if (!AI.bot) { AI.bot = aiAdd('ai-msg bot', ''); AI.text = ''; }
+    AI.text += ev.delta;
+    AI.bot.innerHTML = mdLite(AI.text);
+    $('#aiLog').scrollTop = $('#aiLog').scrollHeight;
+  } else if (ev.type === 'tool') {
+    AI.bot = null;
+    AI.tool = aiAdd('ai-tool run', `${esc(TOOL_LABEL[ev.name] || ev.name)}${ev.input ? ' : ' + esc(ev.input) : ''}`);
+  } else if (ev.type === 'tool_done') {
+    if (AI.tool) { AI.tool.className = 'ai-tool ' + (ev.ok ? 'ok' : 'ko'); if (!ev.ok && ev.message) AI.tool.textContent += ' (' + ev.message + ')'; }
+  } else if (ev.type === 'usage') {
+    AI.usage = ev.usage;
+  } else if (ev.type === 'error') {
+    aiAdd('ai-err', esc(ev.message));
+  } else if (ev.type === 'end') {
+    aiBusy(false);
+    AI.bot = null;
+    $('#aiUndo').disabled = !ev.changed;
+    if (ev.changed) aiAdd('ai-meta', `${ev.changed} fichier${ev.changed > 1 ? 's' : ''} modifié${ev.changed > 1 ? 's' : ''} · « Annuler » les remet comme avant.`);
+  }
+});
+$('#aiForm').onsubmit = e => { e.preventDefault(); aiSend(); };
+$('#aiText').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(); } e.stopPropagation(); });
+$('#aiModel').onchange = async () => { AI.settings = await studio.maxyai.setOptions({ model: $('#aiModel').value }); };
+$('#aiEffort').onchange = async () => { AI.settings = await studio.maxyai.setOptions({ effort: $('#aiEffort').value }); };
+$('#aiNew').onclick = async () => { if (AI.busy) await studio.maxyai.stop(); await studio.maxyai.reset(); $('#aiLog').innerHTML = ''; $('#aiUndo').disabled = true; openMaxyAi(); };
+$('#aiUndo').onclick = async () => { if (S.mode !== 'edit') stop(); const n = await studio.maxyai.undo(); await syncFromDisk(); $('#aiUndo').disabled = true; aiAdd('ai-meta', n ? `${n} fichier${n > 1 ? 's' : ''} remis comme avant.` : 'Rien à annuler.'); };
+$('#aiKeyBtn').onclick = () => aiSetup();
 
 // ---------------- Scripts JavaScript ----------------
 async function ensureJsSetup() {
@@ -1979,7 +2093,8 @@ const MENUS = {
   ],
   plugins: () => plugins ? plugins.menu() : [],
   help: () => [
-    { label: 'Assistants IA (Claude, ChatGPT, Gemini)…', ic: 'plug', fn: aiDialog },
+    { label: 'Maxy AI (assistant intégré)', ic: 'sparkles', fn: () => showBottom('maxyai') },
+    { label: 'Serveur MCP (Claude Code, Gemini)…', ic: 'plug', fn: aiDialog },
     '-',
     { label: 'Guide de syntaxe (MAXYCODE.md)', ic: 'book', fn: () => openScript(allFiles().includes('MAXYCODE.md') ? 'MAXYCODE.md' : 'SCRATCHCODE.md') },
     { label: 'Raccourcis clavier', ic: 'list', fn: shortcutsHelp },

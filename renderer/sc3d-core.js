@@ -154,7 +154,8 @@ export async function buildObject(def, resolveUrl, opts = {}) {
     obj = new THREE.Mesh(buildTerrainGeometry(def.terrain), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }));
     obj.castShadow = true; obj.receiveShadow = true;
   } else if (def.kind === 'particles') {
-    if (!def.particles) def.particles = particlePreset('feu');
+    // Un préréglage seul ({ preset: 'feu' }, écrit par un assistant IA) est complété avec ses valeurs
+    if (!def.particles || def.particles.rate == null) def.particles = { ...particlePreset(def.particles && def.particles.preset), ...(def.particles || {}) };
     obj = new THREE.Group();
     const fx = new Particles(def.particles);
     obj.userData.fx = fx;

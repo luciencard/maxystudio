@@ -1,7 +1,7 @@
 {
   "name": "maxystudio",
   "productName": "MaxyStudio",
-  "version": "2.12.0",
+  "version": "2.13.0",
   "description": "MaxyStudio : un moteur de jeu 2D, 3D et d'applications où le code s'écrit en ScratchCode (blocs Scratch en texte).",
   "main": "main.js",
   "author": "ScratchCode",
@@ -14,6 +14,7 @@
     "dist:linux": "electron-builder --linux"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "monaco-editor": "0.52.2",
     "three": "0.169.0"
   },
@@ -34,6 +35,8 @@
       "preload.js",
       "templates.js",
       "mcp-server.js",
+      "maxy-tools.js",
+      "maxy-ai.js",
       "renderer/**",
       "engine/**",
       "node_modules/monaco-editor/min/**",

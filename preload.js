@@ -50,5 +50,15 @@ contextBridge.exposeInMainWorld('studio', {
     onRequest: (cb) => ipcRenderer.on('mcp:req', (_e, id, method, params) => cb(id, method, params)),
     reply: (id, ok, value) => ipcRenderer.invoke('mcp:res', id, ok, value)
   },
+  maxyai: {
+    settings: () => ipcRenderer.invoke('maxyai:settings'),
+    setOptions: (o) => ipcRenderer.invoke('maxyai:setOptions', o),
+    setKey: (key) => ipcRenderer.invoke('maxyai:setKey', key),
+    send: (text, context) => ipcRenderer.invoke('maxyai:send', text, context),
+    stop: () => ipcRenderer.invoke('maxyai:stop'),
+    reset: () => ipcRenderer.invoke('maxyai:reset'),
+    undo: () => ipcRenderer.invoke('maxyai:undo'),
+    onEvent: (cb) => ipcRenderer.on('maxyai:event', (_e, ev) => cb(ev))
+  },
   onChanged: (cb) => ipcRenderer.on('project:changed', (_e, files) => cb(files))
 });

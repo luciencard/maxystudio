@@ -120,6 +120,7 @@
           <button class="un-tab active" data-btab="project"><span data-ic="folder" data-size="13"></span>Projet</button>
           <button class="un-tab" data-btab="console"><span data-ic="terminal" data-size="13"></span>Console <span class="un-count" id="logCount"></span></button>
           <button class="un-tab" data-btab="debug"><span data-ic="bug" data-size="13"></span>Débogueur</button>
+          <button class="un-tab" data-btab="maxyai"><span data-ic="sparkles" data-size="13"></span>Maxy AI</button>
           <button class="un-tab" data-btab="anim"><span data-ic="clock" data-size="13"></span>Animation</button>
           <button class="un-tab" data-btab="library"><span data-ic="box" data-size="13"></span>Bibliothèque</button>
           <span class="grow"></span>
@@ -127,6 +128,13 @@
             <button class="un-btn sm" id="importBtn"><span data-ic="download" data-size="13"></span>Importer</button>
             <button class="un-btn sm" id="createBtn"><span data-ic="plus" data-size="13"></span>Créer</button>
             <div class="un-search sm"><span data-ic="search" data-size="12"></span><input id="assetSearch" placeholder="Rechercher" spellcheck="false"></div>
+          </div>
+          <div class="un-btools" id="aiTools" hidden>
+            <select class="f" id="aiModel" title="Modèle"></select>
+            <select class="f" id="aiEffort" title="Réflexion"><option value="low">Rapide</option><option value="medium">Équilibré</option><option value="high">Approfondi</option></select>
+            <button class="un-btn sm" id="aiUndo" title="Remet les fichiers comme avant la dernière réponse de Maxy AI" disabled>Annuler</button>
+            <button class="un-btn sm" id="aiNew" title="Nouvelle conversation (efface la discussion)">Nouvelle discussion</button>
+            <button class="un-ibtn" id="aiKeyBtn" title="Clé API"><span data-ic="settings" data-size="14"></span></button>
           </div>
           <div class="un-btools" id="animTools" hidden></div>
           <div class="un-btools" id="libTools" hidden>
@@ -159,6 +167,10 @@
           </div>
           <div class="un-console" id="consoleView" hidden></div>
           <div class="un-debug" id="debugView" hidden></div>
+          <div class="un-ai" id="aiView" hidden>
+            <div class="ai-log" id="aiLog"></div>
+            <form class="ai-input" id="aiForm"><textarea id="aiText" rows="2" placeholder="Demande à Maxy AI : « Ajoute un ennemi qui suit le joueur », « Pourquoi mon saut ne marche pas ? »…" spellcheck="true"></textarea><button class="un-btn primary" id="aiSend" type="submit">Envoyer</button></form>
+          </div>
           <div class="un-anim" id="animView" hidden></div>
           <div class="un-library" id="libraryView" hidden>
             <div class="lib-bar" id="libBar"><span id="libInfo">Chargement de la bibliothèque…</span><span class="grow"></span><span id="libActions"></span></div>
