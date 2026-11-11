@@ -204,6 +204,24 @@ Pour partager le projet, utilise Fichier > Exporter : tout le dossier devient un
 - Bibliothèque standard : \`import [maths]\` donne \`(max (a) (b))\`, \`(min (a) (b))\`, \`(borne (x) (bas) (haut))\`, \`(distance (x1) (y1) (x2) (y2))\`, \`(interpoler (a) (b) (t))\`, \`(signe (x))\`, \`(arrondir (x) (chiffres))\`, \`(pourcentage (part) (total))\`. \`import [texte]\` donne \`(repeter [ab] (3))\`, \`(inverser [texte])\`. \`import [hasard]\` donne \`(pile ou face)\` (0 ou 1) et \`(chance (30))\` (1 dans 30 % des cas).
 - Commentaires : \`// comme ceci\`
 ${type === '3d' ? BLOCKS_3D : type === 'app' ? BLOCKS_UI : ''}
+## JavaScript (le langage rapide)
+Comme Blueprint et C++ dans Unreal : MaxyCode pour aller vite, JavaScript pour la puissance. À la création d'un script, choisis « JavaScript » : le fichier \`scripts/Nom.js\` s'exécute tel quel dans le moteur, sans traduction. Fichier > Ouvrir dans VS Code (ou VS Code Insiders, Visual Studio 2022) ouvre le projet avec l'autocomplétion (\`types/maxy.d.ts\`) ; ce que tu enregistres là-bas revient tout seul dans MaxyStudio.
+\`\`\`js
+export default class Joueur extends Maxy.Script {
+  start() { this.speed = 240; }            // une fois, au lancement
+  update(dt) {                             // à chaque image (dt en secondes)
+    this.x += Maxy.axis('horizontal') * this.speed * dt;
+    if (Maxy.keyPressed('Space')) Maxy.send('saut');
+    Maxy.ui('Score').text = 'Score : ' + Maxy.vars.score;
+  }
+  onClick() { this.say('Bonjour !', 1.5); }
+  onMessage(message, data) { }             // messages de Maxy.send() et de MaxyCode (broadcast)
+}
+\`\`\`
+- Objet : \`this.x\`, \`this.y\`, \`this.direction\`, \`this.size\`, \`this.costume\`, \`this.move()\`, \`this.say()\`, \`this.touching('Mur')\` ; en 3D \`this.position\`, \`this.rotation\`, \`this.moveForward()\`, \`this.rotate(x, y, z)\`, \`this.jump()\`, \`this.velocity\`, \`this.onGround\`, \`this.playAnimation()\`.
+- Monde : \`Maxy.vars\` (variables de la Scène, partagées avec MaxyCode), \`Maxy.key('ArrowUp')\`, \`Maxy.axis('vertical')\`, \`Maxy.mouse\`, \`Maxy.find('Ennemi')\`, \`Maxy.send('message', données)\`, \`Maxy.ui('Vie').value = 50\`, \`Maxy.goToScene('Niveau 2')\`, \`Maxy.random(1, 6)\`, \`await Maxy.wait(1)\`, \`Maxy.log()\`, \`Maxy.THREE\` (3D).
+- Pour lire en MaxyCode une variable créée par JavaScript, crée-la d'abord dans MaxyCode avec \`set [nom v] to (0)\`.
+
 ## Exemple
 \`\`\`
 when app run

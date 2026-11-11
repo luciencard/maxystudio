@@ -651,6 +651,46 @@ ipcMain.handle('plugins:setEnabled', async (_e, id, on) => {
 ipcMain.handle('plugins:openFolder', async () => { await fsp.mkdir(pluginsDir(), { recursive: true }); return shell.openPath(pluginsDir()); });
 ipcMain.handle('shell:openExternal', (_e, url) => /^https:\/\//.test(url) ? shell.openExternal(url) : null);
 
+// ---------- Éditeurs de code externes (VS Code, VS Code Insiders, Visual Studio 2022) ----------
+function findEditors() {
+  const out = [];
+  const add = (id, label, exe, kind) => { if (exe && fs.existsSync(exe) && !out.some(e => e.id === id)) out.push({ id, label, exe, kind }); };
+  if (process.platform === 'win32') {
+    const local = process.env.LOCALAPPDATA || '', pf = process.env.ProgramFiles || 'C:\Program Files', pf86 = process.env['ProgramFiles(x86)'] || 'C:\Program Files (x86)';
+    for (const base of [path.join(local, 'Programs'), pf]) {
+      add('code', 'VS Code', path.join(base, 'Microsoft VS Code', 'Code.exe'), 'code');
+      add('insiders', 'VS Code Insiders', path.join(base, 'Microsoft VS Code Insiders', 'Code - Insiders.exe'), 'code');
+    }
+    for (const base of [pf, pf86]) for (const ed of ['Community', 'Professional', 'Enterprise', 'Preview']) {
+      add('vs2022', 'Visual Studio 2022', path.join(base, 'Microsoft Visual Studio', '2022', ed, 'Common7', 'IDE', 'devenv.exe'), 'vs');
+    }
+  } else if (process.platform === 'darwin') {
+    add('code', 'VS Code', '/Applications/Visual Studio Code.app', 'mac');
+    add('insiders', 'VS Code Insiders', '/Applications/Visual Studio Code - Insiders.app', 'mac');
+  } else {
+    for (const p of ['/usr/bin/code', '/usr/share/code/bin/code', '/snap/bin/code', '/var/lib/flatpak/exports/bin/com.visualstudio.code']) add('code', 'VS Code', p, 'code');
+    for (const p of ['/usr/bin/code-insiders', '/usr/share/code-insiders/bin/code-insiders', '/snap/bin/code-insiders']) add('insiders', 'VS Code Insiders', p, 'code');
+  }
+  return out;
+}
+ipcMain.handle('editors:list', () => findEditors().map(({ id, label }) => ({ id, label })));
+ipcMain.handle('editors:open', (_e, id, dir, rel, line) => {
+  const ed = findEditors().find(x => x.id === id);
+  if (!ed) throw new Error('Éditeur introuvable.');
+  if (!fs.existsSync(path.join(dir, CFG))) throw new Error('Projet introuvable.');
+  const file = rel ? safeJoin(dir, rel) : null;
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  let cmd = ed.exe, args;
+  if (ed.kind === 'mac') { cmd = 'open'; args = ['-a', ed.exe, dir, ...(file ? [file] : [])]; }
+  else if (ed.kind === 'vs') args = [dir];
+  else args = [dir, ...(file ? ['-g', `${file}:${line || 1}`] : [])];
+  const child = require('child_process').spawn(cmd, args, { detached: true, stdio: 'ignore', env, windowsHide: false });
+  child.on('error', err => console.warn('editor', err));
+  child.unref();
+  return true;
+});
+
 app.whenReady().then(async () => {
   await migrateFromScratchCodeStudio().catch(() => {});
   registerProtocol();

@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld('studio', {
   reveal: (dir, rel) => ipcRenderer.invoke('shell:reveal', dir, rel),
   showHub: () => ipcRenderer.invoke('hub:show'),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
+  editors: {
+    list: () => ipcRenderer.invoke('editors:list'),
+    open: (id, dir, rel, line) => ipcRenderer.invoke('editors:open', id, dir, rel, line)
+  },
   library: {
     index: () => ipcRenderer.invoke('library:index'),
     import: (dir, file) => ipcRenderer.invoke('library:import', dir, file)

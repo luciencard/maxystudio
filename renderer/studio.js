@@ -5,6 +5,7 @@ import { SceneView2D } from './scene-view2d.js';
 import { initPlugins } from './plugins.js';
 import { UiEditor, UI_TYPES, UI_ICON, defaultUiElement } from './ui-editor.js';
 import { AnimEditor, newClip } from './anim-editor.js';
+import { MAXY_DTS, JSCONFIG, jsTemplate } from './maxyjs-types.js';
 import { compileMaxyCode, originalLine, originOf, findImports, STDLIB } from './maxycode.js';
 
 hydrateIcons();
@@ -94,7 +95,7 @@ function kindOf(rel) {
   if (core.MODEL_EXT.includes(e)) return 'model';
   if (core.IMAGE_EXT.includes(e)) return 'image';
   if (core.SOUND_EXT.includes(e)) return 'sound';
-  if (e === 'sc') return 'sc';
+  if (e === 'sc' || e === 'js') return 'sc';
   if (e === 'scene') return 'scene';
   if (e === 'prefab') return 'prefab';
   if (e === 'anim') return 'anim';
@@ -444,7 +445,7 @@ const color = (k, v) => `<input class="f" type="color" data-k="${k}" data-t="col
 const check = (k, v, text = '') => `<label class="in-check"><input type="checkbox" data-k="${k}" data-t="check"${v ? ' checked' : ''}>${text}</label>`;
 const range = (k, v, min, max, step) => `<div class="in-row2"><input type="range" data-k="${k}" data-t="range" min="${min}" max="${max}" step="${step}" value="${+v}"><span class="in-l" style="width:34px;text-align:right" data-out="${k}">${fmt(v)}</span></div>`;
 const selectF = (k, v, options) => `<select class="f" data-k="${k}" data-t="select">${options.map(([val, text]) => `<option value="${esc(val)}"${String(val) === String(v) ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select>`;
-const scriptOptions = () => [['', '(aucun)'], ...filesBy(['sc']).map(f => [f, f])];
+const scriptOptions = () => [['', '(aucun)'], ...filesBy(['sc', 'js']).map(f => [f, f])];
 
 function renderInsp() {
   const box = $('#insp');
@@ -465,7 +466,8 @@ function head(o, ic) {
 function scriptComp(target, key = 'script') {
   const cur = getPath(target, key) || '';
   return comp('script', 'fileCode', 'Script', `${lbl('Fichier')}${selectF(key, cur, scriptOptions())}
-    <div class="full in-row2"><button class="un-btn sm" data-act="openScript"${cur ? '' : ' disabled'}>${icon('edit', 12)}Ouvrir</button><button class="un-btn sm" data-act="newScript">${icon('plus', 12)}Nouveau script</button></div>`, { remove: cur ? 'script' : '' });
+    <div class="full in-row2"><button class="un-btn sm" data-act="openScript"${cur ? '' : ' disabled'}>${icon('edit', 12)}Ouvrir</button>${cur && EDITORS.length ? `<button class="un-btn sm" data-act="openVsc" title="Ouvrir dans ${esc(EDITORS[0].label)}">${icon('code', 12)}${esc(EDITORS[0].label)}</button>` : ''}<button class="un-btn sm" data-act="newScript">${icon('plus', 12)}Nouveau script</button></div>
+    ${/\.js$/.test(cur) ? '<div class="full in-note">Script JavaScript : il s&#39;exécute tel quel dans le moteur, sans traduction.</div>' : ''}`, { remove: cur ? 'script' : '' });
 }
 function renderObj3D(box, o) {
   const textures = [['', '(aucune)'], ...filesBy(core.IMAGE_EXT).map(f => [f, f])];
@@ -672,6 +674,7 @@ function bindInsp(root, target, howOf, scope) {
   });
   const act = (a, fn) => { const b = area.querySelector(`[data-act="${a}"]`); if (b) b.onclick = fn; };
   act('openScript', () => target.script && openScript(target.script));
+  act('openVsc', () => openInEditor(EDITORS[0] && EDITORS[0].id, getPath(target, 'script') || target.worldScript || (target.stage && target.stage.script)));
   act('newScript', () => newScriptFor(target));
   act('prefabApply', () => applyPrefab(target.id));
   act('openAnim', () => openAnim(target.animator && target.animator.clip));
@@ -684,7 +687,7 @@ function bindInsp(root, target, howOf, scope) {
     { label: 'Physique', ic: 'physics', disabled: target.rigidbody && target.rigidbody.enabled, fn: () => { snapshot(); target.rigidbody = { enabled: true, gravity: 1, bounce: 0 }; if (!target.collider) target.collider = true; saveScene(); renderInsp(); } },
     { label: 'Animation', ic: 'clock', disabled: !!target.animator, fn: () => addAnimTo(target) },
     { label: 'Collision', ic: 'shield', disabled: !!target.collider, fn: () => { snapshot(); target.collider = true; saveScene(); renderInsp(); } },
-    { label: 'Script existant…', ic: 'fileCode', disabled: !!target.script || !filesBy(['sc']).length, fn: () => { snapshot(); target.script = filesBy(['sc'])[0]; saveScene(); renderInsp(); renderHier(); } },
+    { label: 'Script existant…', ic: 'fileCode', disabled: !!target.script || !filesBy(['sc', 'js']).length, fn: () => { snapshot(); target.script = filesBy(['sc', 'js'])[0]; saveScene(); renderInsp(); renderHier(); } },
     { label: 'Nouveau script', ic: 'plus', disabled: !!target.script, fn: () => newScriptFor(target) }
   ]));
 }
@@ -957,9 +960,18 @@ async function dropAsset(rel, point, onId) {
 
 // ---------------- Scripts (onglets de code) ----------------
 async function newScript(name, code) {
-  const n = await ask('Nom du script', name);
+  let lang = 'sc';
+  try { lang = localStorage.getItem('studio.scriptLang') === 'js' ? 'js' : 'sc'; } catch { /* stockage indisponible */ }
+  const ok = await modal('Nouveau script', `<label class="m-l">Nom</label><input class="f" id="nsName" value="${esc(name)}" spellcheck="false">
+    <label class="m-l">Langage</label><select class="f" id="nsLang"><option value="sc"${lang === 'sc' ? ' selected' : ''}>MaxyCode (blocs en texte, simple)</option><option value="js"${lang === 'js' ? ' selected' : ''}>JavaScript (le plus rapide, VS Code)</option></select>
+    <p class="m-note">MaxyCode et JavaScript peuvent être mélangés dans un même jeu : ils partagent les variables de la Scène, les messages et l'interface.</p>`, { ok: 'Créer', focus: '#nsName' });
+  if (!ok) return null;
+  const n = $('#modalBody #nsName').value.trim();
+  lang = $('#modalBody #nsLang').value;
   if (!n) return null;
-  let rel = `scripts/${n.replace(/[<>:"/\\|?*]/g, '').replace(/\.sc$/, '')}.sc`;
+  try { localStorage.setItem('studio.scriptLang', lang); } catch { /* stockage indisponible */ }
+  let rel = `scripts/${n.replace(/[<>:"/\\|?*]/g, '').replace(/\.(sc|js)$/, '')}.${lang}`;
+  if (lang === 'js') { code = jsTemplate(S.type, n); await ensureJsSetup(); }
   if (allFiles().includes(rel)) { toast('Un script porte déjà ce nom : il est réutilisé.'); }
   else await writeText(rel, code);
   await refreshTree();
@@ -980,7 +992,7 @@ async function openScript(rel, line) {
   if (!S.models.has(rel)) {
     let text;
     try { text = await studio.readFile(DIR, rel); } catch { return toast(`Fichier introuvable : ${rel}`, true); }
-    const lang = rel.endsWith('.sc') ? 'scratchcode' : rel.endsWith('.md') ? 'markdown' : (rel.endsWith('.json') || rel.endsWith('.maxycode') || rel.endsWith('.scratchcode') || rel.endsWith('.scene')) ? 'json' : 'plaintext';
+    const lang = rel.endsWith('.sc') ? 'scratchcode' : rel.endsWith('.js') ? 'javascript' : rel.endsWith('.md') ? 'markdown' : (rel.endsWith('.json') || rel.endsWith('.maxycode') || rel.endsWith('.scratchcode') || rel.endsWith('.scene')) ? 'json' : 'plaintext';
     const model = monaco.editor.createModel(text, lang, monaco.Uri.parse('file:///' + encodeURI(rel)));
     model.onDidChangeContent(() => renderTabs());
     S.models.set(rel, model); S.saved.set(rel, text);
@@ -1180,6 +1192,7 @@ async function runScene(sc, scene, vars, name, debug = DBG.on) {
   let errors = 0;
   S.problems = {};
   const compile = async (target, rel) => {
+    if (rel && /\.js$/i.test(rel)) return; // Script JavaScript : lancé par maxyjs.js
     // MaxyCode (fonctions qui renvoient une valeur…) est d'abord traduit en blocs Scratch ; les erreurs gardent les lignes d'origine.
     const src = await readScript(rel);
     // Modules importés (scripts du projet) : lus d'avance, avec leurs propres imports
@@ -1214,6 +1227,7 @@ async function runScene(sc, scene, vars, name, debug = DBG.on) {
   if (errors) log('warn', `${errors} erreur${errors > 1 ? 's' : ''} : les scripts concernés ne sont pas chargés.`);
   else log('ok', 'Compilation réussie, aucune erreur.');
   if (vars) restoreVars(vm, vars);
+  frame.contentWindow.__maxyJsBust = '?v=' + Date.now();
   vm.greenFlag();
   frame.focus();
 }
@@ -1365,6 +1379,34 @@ function detachPrefab(id) {
 }
 
 
+
+
+// ---------------- Scripts JavaScript ----------------
+async function ensureJsSetup() {
+  const files = allFiles();
+  if (!files.includes('types/maxy.d.ts') || (await studio.readFile(DIR, 'types/maxy.d.ts').catch(() => '')) !== MAXY_DTS) await writeText('types/maxy.d.ts', MAXY_DTS);
+  if (!files.includes('jsconfig.json')) await writeText('jsconfig.json', JSCONFIG);
+}
+let EDITORS = [];
+if (studio.editors) studio.editors.list().then(l => { EDITORS = l || []; }).catch(() => {});
+/** Ouvre le projet (et le script actif) dans VS Code, VS Code Insiders ou Visual Studio 2022. */
+async function openInEditor(id, rel = null, line = 1) {
+  const ed = EDITORS.find(e => e.id === id) || EDITORS[0];
+  if (!ed) { toast("VS Code n'est pas installé : Fichier > Installer VS Code.", true); return; }
+  await saveAll();
+  await ensureJsSetup();
+  const file = rel || (S.active && !FIXED_TABS.includes(S.active) ? S.active : null);
+  try {
+    await studio.editors.open(ed.id, DIR, file, line);
+    status(`Ouvert dans ${ed.label}. Les changements enregistrés là-bas reviennent tout seuls ici.`);
+  } catch (e) { toast(cleanErr(e), true); }
+}
+function setupJsLanguage() {
+  const js = monaco.languages.typescript && monaco.languages.typescript.javascriptDefaults;
+  if (!js) return;
+  js.setCompilerOptions({ target: monaco.languages.typescript.ScriptTarget.ES2020, allowNonTsExtensions: true, allowJs: true, checkJs: false, module: monaco.languages.typescript.ModuleKind.ESNext });
+  js.addExtraLib(MAXY_DTS, 'file:///types/maxy.d.ts');
+}
 
 // ---------------- Interface (HUD) ----------------
 let uiEd = null;
@@ -1837,6 +1879,9 @@ const MENUS = {
     { label: 'Tout enregistrer', ic: 'save', key: 'Ctrl+S', fn: saveAll },
     { label: 'Exporter le projet (.maxycode)…', ic: 'share', fn: exportProject },
     '-',
+    ...(EDITORS.length
+      ? EDITORS.map(ed => ({ label: `Ouvrir dans ${ed.label}`, ic: 'code', fn: () => openInEditor(ed.id) }))
+      : [{ label: 'Installer VS Code (gratuit)…', ic: 'code', fn: () => studio.openExternal('https://code.visualstudio.com/') }]),
     { label: 'Ouvrir le dossier du projet', ic: 'external', fn: () => studio.reveal(DIR) },
     { label: 'Écran d\'accueil', ic: 'home', fn: () => studio.showHub() }
   ],
@@ -2020,6 +2065,7 @@ function setupMonaco() {
   window.require.config({ paths: { vs: '/monaco/vs' } });
   window.require(['vs/editor/editor.main'], () => {
     monaco = window.monaco;
+    setupJsLanguage();
     monaco.languages.register({ id: 'scratchcode', extensions: ['.sc'] });
     monaco.languages.setMonarchTokensProvider('scratchcode', {
       tokenizer: { root: [

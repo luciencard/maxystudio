@@ -285,6 +285,15 @@
   // Pas à pas depuis l'éditeur (bouton « Image suivante »)
   W.stepOnce = () => { if (W.world) { simulate(1 / 30); render(); } };
 
+  // ---------- API pour les scripts JavaScript (maxyjs.js) ----------
+  W.api = {
+    move: (o, v, body) => moveWithCollision(o, v, body),
+    touching: (o, name) => touching(o, name),
+    physics: (o, on) => { if (!on) W.bodies.delete(o); else if (!W.bodies.has(o)) W.bodies.set(o, { v: new core.THREE.Vector3(), grounded: false, gravity: 1, bounce: 0 }); },
+    playAnim: (o, name, once) => playAnim(o, name, once),
+    remove: o => { o.parent && o.parent.remove(o); W.objects.delete(o.userData.id); W.bodies.delete(o); W.mixers.delete(o); }
+  };
+
   // ---------- Outils pour les blocs ----------
   function self(util) { return byName(util.target.getName()); }
   function byName(name) {

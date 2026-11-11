@@ -107,8 +107,30 @@
       hud.set(e.name, el);
     }
   }
+  window.__maxyUi = { get: id => getEl(id) };
   const getEl = id => { id = Cast.toString(id); return els.get(id) || hud.get(id) || [...hud.entries()].find(([k]) => k.toLowerCase() === id.toLowerCase())?.[1]; };
-  runtime.on('PROJECT_START', () => { clearAll(); buildHud(); startAnims(); });
+  runtime.on('PROJECT_START', () => { clearAll(); buildHud(); startAnims(); startJs(); });
+
+  // ---------- Scripts JavaScript (maxyjs.js) ----------
+  let jsMod = null;
+  const hasJs = () => {
+    const sc = project().scene || {};
+    return [sc.worldScript, sc.stage && sc.stage.script, ...(sc.objects || []).map(o => o.script)].some(r => r && /\.js$/i.test(r));
+  };
+  function startJs() {
+    if (!hasJs()) { if (jsMod) jsMod.stop(); return; }
+    import(new URL('/studio/maxyjs.js', location.href).href).then(m => {
+      jsMod = m;
+      return m.start({ runtime, project: project(), base: project().base, bust: window.__maxyJsBust || '' });
+    }).catch(e => runtime.emit('SC_PRINT', { text: 'Scripts JavaScript : ' + (e.message || e), level: 'error' }));
+  }
+  runtime.on('PROJECT_STOP_ALL', () => { if (jsMod) jsMod.stop(); });
+  // Clics et messages de MaxyCode : transmis aussi aux scripts .js
+  const startHats = runtime.startHats;
+  runtime.startHats = function (opcode, fields, target) {
+    if (jsMod) { try { jsMod.hat(opcode, fields, target); } catch (e) { /* ignoré */ } }
+    return startHats.apply(this, arguments);
+  };
 
   // ---------- Clips d'animation (assets/animations/*.anim, éditeur d'animation de MaxyStudio) ----------
   // Même calcul que anim-editor.js.
@@ -184,6 +206,10 @@
     }
   }
   runtime.on('PROJECT_STOP_ALL', () => { animOn = false; });
+  window.__maxyAnim = {
+    play: (name, clip, once) => loadClip(clipRel(clip)).then(c => { if (c) { animOn = true; anims.set(name, { clip: c, t: 0, playing: true, once: !!once }); } }),
+    stop: name => anims.delete(name)
+  };
 
   const S = (v = '') => ({ type: Scratch.ArgumentType.STRING, defaultValue: v });
   const cmd = (opcode, text, args = {}) => ({ opcode, blockType: Scratch.BlockType.COMMAND, text, arguments: args });
