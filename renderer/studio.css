@@ -329,3 +329,9 @@ body.un textarea.f:focus { border-color: var(--accent); }
 .m-l { display: block; margin: 10px 0 4px; font-size: 12px; color: var(--dim, #9a9da6); }
 .m-l:first-child { margin-top: 0; }
 .m-note { margin: 12px 0 0; font-size: 12px; line-height: 1.45; color: var(--dim, #9a9da6); }
+
+/* Assistants IA */
+.ai-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 4px; }
+.ai-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border: 1px solid var(--line, #393b40); border-radius: 6px; }
+.ai-row b { display: block; font-size: 13px; }
+.ai-row span { font-size: 12px; color: var(--dim, #9a9da6); }

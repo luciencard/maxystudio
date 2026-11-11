@@ -1,7 +1,7 @@
 {
   "name": "maxystudio",
   "productName": "MaxyStudio",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "description": "MaxyStudio : un moteur de jeu 2D, 3D et d'applications où le code s'écrit en ScratchCode (blocs Scratch en texte).",
   "main": "main.js",
   "author": "ScratchCode",
@@ -33,6 +33,7 @@
       "main.js",
       "preload.js",
       "templates.js",
+      "mcp-server.js",
       "renderer/**",
       "engine/**",
       "node_modules/monaco-editor/min/**",

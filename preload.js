@@ -42,5 +42,13 @@ contextBridge.exposeInMainWorld('studio', {
     setEnabled: (id, on) => ipcRenderer.invoke('plugins:setEnabled', id, on),
     openFolder: () => ipcRenderer.invoke('plugins:openFolder')
   },
+  ai: {
+    list: () => ipcRenderer.invoke('ai:list'),
+    connect: (id) => ipcRenderer.invoke('ai:connect', id),
+    disconnect: (id) => ipcRenderer.invoke('ai:disconnect', id),
+    config: () => ipcRenderer.invoke('ai:config'),
+    onRequest: (cb) => ipcRenderer.on('mcp:req', (_e, id, method, params) => cb(id, method, params)),
+    reply: (id, ok, value) => ipcRenderer.invoke('mcp:res', id, ok, value)
+  },
   onChanged: (cb) => ipcRenderer.on('project:changed', (_e, files) => cb(files))
 });

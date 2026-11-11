@@ -1381,6 +1381,58 @@ function detachPrefab(id) {
 
 
 
+
+// ---------------- Assistants IA (MCP) ----------------
+// Claude Desktop, Codex (ChatGPT) et Antigravity (Gemini) pilotent MaxyStudio par mcp-server.js.
+const fmtLog = l => `[${l.level}]${l.who ? ' ' + l.who + ' :' : ''} ${l.text}${l.loc ? ` (${l.loc.rel}, ligne ${l.loc.line})` : ''}`;
+if (studio.ai) studio.ai.onRequest(async (id, method, params) => {
+  try {
+    let out;
+    if (method === 'viewRect') {
+      const el = S.mode !== 'edit' ? $('#gameView') : S.active === 'ui' ? $('#uiView') : $('#sceneView');
+      if (el.hidden) activateTab(S.mode !== 'edit' ? 'game' : 'scene');
+      await new Promise(r => setTimeout(r, 120));
+      const r = (el.hidden ? $('#sceneView') : el).getBoundingClientRect();
+      out = { rect: { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) }, view: S.mode !== 'edit' ? 'Vue Jeu (jeu en cours)' : 'Vue Scène (jeu arrêté)' };
+    } else if (method === 'play') {
+      if (S.mode !== 'edit') stop();
+      // La console peut être vidée au lancement : on repère la dernière ligne d'avant
+      const mark = S.logs[S.logs.length - 1];
+      await play();
+      await new Promise(r => setTimeout(r, (params.seconds || 2) * 1000));
+      const i = mark ? S.logs.lastIndexOf(mark) : -1;
+      out = { running: S.mode !== 'edit', console: S.logs.slice(i + 1).map(fmtLog) };
+    } else if (method === 'stop') {
+      if (S.mode !== 'edit') stop();
+      out = 'Jeu arrêté.';
+    } else if (method === 'console') {
+      out = S.logs.slice(-(params.limit || 50)).map(fmtLog);
+    } else throw new Error('Méthode inconnue.');
+    studio.ai.reply(id, true, out);
+  } catch (e) { studio.ai.reply(id, false, cleanErr(e)); }
+});
+async function aiDialog() {
+  if (!studio.ai) return toast('Disponible dans l\u2019application MaxyStudio pour ordinateur.', true);
+  const list = await studio.ai.list();
+  const row = a => `<div class="ai-row"><div><b>${esc(a.label)}</b><span>${!a.installed ? 'Pas installé sur cet ordinateur' : a.connected ? 'Connecté à MaxyStudio' : 'Installé, pas encore connecté'}</span></div>
+    ${a.installed ? (a.connected ? `<button class="un-btn sm" data-aioff="${a.id}">Déconnecter</button>` : `<button class="un-btn sm primary" data-aion="${a.id}">Connecter</button>`) : ''}</div>`;
+  const p = modal('Assistants IA', `<p class="m-note" style="margin-top:0">Connecte ton assistant : il pourra lire et modifier tes scripts et tes scènes, lancer le jeu, lire la console et voir une capture du jeu. Il utilise ton abonnement à cet assistant ; MaxyStudio n'envoie rien ailleurs.</p>
+    <div class="ai-list">${list.map(row).join('')}</div>
+    <p class="m-note">Après « Connecter », redémarre l'assistant, puis demande-lui par exemple : « Dans MaxyStudio, ajoute un ennemi qui suit le joueur ». MaxyStudio doit rester ouvert pour lancer le jeu et faire des captures.</p>
+    <p class="m-note">Autre outil compatible MCP (VS Code, Cursor…) : <a href="#" id="aiCopy">copier la configuration</a>.</p>`, { ok: 'Fermer', cancel: '' });
+  const body = $('#modalBody');
+  body.querySelectorAll('[data-aion]').forEach(b => b.onclick = async () => {
+    try { const r = await studio.ai.connect(b.dataset.aion); toast(`${r.label} est connecté. ${r.note}`); $('#modalOk').click(); aiDialog(); }
+    catch (e) { toast(cleanErr(e), true); }
+  });
+  body.querySelectorAll('[data-aioff]').forEach(b => b.onclick = async () => {
+    try { await studio.ai.disconnect(b.dataset.aioff); $('#modalOk').click(); aiDialog(); } catch (e) { toast(cleanErr(e), true); }
+  });
+  const cp = body.querySelector('#aiCopy');
+  if (cp) cp.onclick = async e => { e.preventDefault(); await navigator.clipboard.writeText(await studio.ai.config()); toast('Configuration MCP copiée.'); };
+  return p;
+}
+
 // ---------------- Scripts JavaScript ----------------
 async function ensureJsSetup() {
   const files = allFiles();
@@ -1927,11 +1979,13 @@ const MENUS = {
   ],
   plugins: () => plugins ? plugins.menu() : [],
   help: () => [
+    { label: 'Assistants IA (Claude, ChatGPT, Gemini)…', ic: 'plug', fn: aiDialog },
+    '-',
     { label: 'Guide de syntaxe (MAXYCODE.md)', ic: 'book', fn: () => openScript(allFiles().includes('MAXYCODE.md') ? 'MAXYCODE.md' : 'SCRATCHCODE.md') },
     { label: 'Raccourcis clavier', ic: 'list', fn: shortcutsHelp },
     { label: 'Site MaxyGame', ic: 'external', fn: () => window.open('https://maxygame.web.app') },
     '-',
-    { label: 'À propos de MaxyStudio', ic: 'info', fn: async () => modal('MaxyStudio', `<p class="in-note" style="font-size:13px">Version ${esc(await studio.version())}<br>Moteur 2D : Scratch 3. Moteur 3D : three.js.<br>Projets au format .maxycode.</p>`, { cancel: '' }) }
+    { label: 'À propos de MaxyStudio', ic: 'info', fn: async () => modal('MaxyStudio', `<p class="in-note" style="font-size:13px">Version ${esc(await studio.version())}<br>Moteur 2D : Scratch 3 (machine virtuelle TurboWarp, licence MPL-2.0). Moteur 3D : three.js.<br>Projets au format .maxycode.</p>`, { cancel: '' }) }
   ]
 };
 document.querySelectorAll('.un-menu').forEach(b => {

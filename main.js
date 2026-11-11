@@ -14,6 +14,8 @@ const fs = require('fs');
 const fsp = fs.promises;
 const zlib = require('zlib');
 const crypto = require('crypto');
+const http = require('http');
+const os = require('os');
 const T = require('./templates');
 
 // ---------- Zip (écriture et lecture, sans dépendance) ----------
@@ -414,6 +416,8 @@ async function buildPlayArchive(dir, spec) {
 // ---------- Fenêtres ----------
 let hubWin = null;
 const watchers = new Map();
+const projectWins = new Map(); // id de fenêtre -> dossier du projet
+let lastProjectWin = null;
 
 function createHub() {
   if (hubWin && !hubWin.isDestroyed()) { hubWin.focus(); return; }
@@ -435,6 +439,8 @@ async function openProjectWindow(dir) {
     webPreferences: { preload: path.join(ROOT, 'preload.js'), contextIsolation: true }
   });
   win.loadURL('app://studio/studio/studio.html?dir=' + encodeURIComponent(dir));
+  projectWins.set(win.id, dir); lastProjectWin = win;
+  win.on('focus', () => { lastProjectWin = win; });
   // Les changements faits par un autre outil (éditeur, assistant IA) sont envoyés à l'éditeur.
   let timer = null; const changed = new Set();
   try {
@@ -449,7 +455,7 @@ async function openProjectWindow(dir) {
     });
     watchers.set(win.id, w);
   } catch (e) { console.warn('watch', e); }
-  win.on('closed', () => { const w = watchers.get(win.id); if (w) w.close(); watchers.delete(win.id); });
+  win.on('closed', () => { const w = watchers.get(win.id); if (w) w.close(); watchers.delete(win.id); projectWins.delete(win.id); if (lastProjectWin === win) lastProjectWin = null; });
   if (hubWin && !hubWin.isDestroyed()) hubWin.close();
 }
 
@@ -651,6 +657,141 @@ ipcMain.handle('plugins:setEnabled', async (_e, id, on) => {
 ipcMain.handle('plugins:openFolder', async () => { await fsp.mkdir(pluginsDir(), { recursive: true }); return shell.openPath(pluginsDir()); });
 ipcMain.handle('shell:openExternal', (_e, url) => /^https:\/\//.test(url) ? shell.openExternal(url) : null);
 
+
+// ---------- Assistants IA (MCP) : Claude Desktop, Codex (ChatGPT), Antigravity (Gemini) ----------
+// mcp-server.js est lancé par l'assistant ; il parle à MaxyStudio par ce pont local (127.0.0.1 + jeton aléatoire).
+const bridgeFile = () => path.join(app.getPath('userData'), 'mcp-bridge.json');
+const mcpWaits = new Map();
+let mcpSeq = 0;
+function activeProjectWin() {
+  if (lastProjectWin && !lastProjectWin.isDestroyed()) return lastProjectWin;
+  const id = [...projectWins.keys()].pop();
+  return id ? BrowserWindow.fromId(id) : null;
+}
+function askRenderer(win, method, params, timeout = 25000) {
+  return new Promise((resolve, reject) => {
+    const id = ++mcpSeq;
+    const t = setTimeout(() => { mcpWaits.delete(id); reject(new Error('MaxyStudio ne répond pas.')); }, timeout);
+    mcpWaits.set(id, { resolve: v => { clearTimeout(t); resolve(v); }, reject: e => { clearTimeout(t); reject(e); } });
+    win.webContents.send('mcp:req', id, method, params);
+  });
+}
+ipcMain.handle('mcp:res', (_e, id, ok, value) => {
+  const w = mcpWaits.get(id); if (!w) return;
+  mcpWaits.delete(id);
+  ok ? w.resolve(value) : w.reject(new Error(String(value)));
+});
+function startBridge() {
+  const token = crypto.randomBytes(24).toString('hex');
+  const server = http.createServer((req, res) => {
+    const reply = (code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
+    if (req.method !== 'POST' || req.url !== '/mcp' || req.headers.origin) return reply(404, { error: 'introuvable' });
+    let body = '';
+    req.on('data', c => { body += c; if (body.length > 1e6) req.destroy(); });
+    req.on('end', async () => {
+      let msg;
+      try { msg = JSON.parse(body); } catch { return reply(400, { error: 'JSON invalide' }); }
+      if (!msg || typeof msg.token !== 'string' || msg.token.length !== token.length || !crypto.timingSafeEqual(Buffer.from(msg.token), Buffer.from(token))) return reply(403, { error: 'Jeton refusé.' });
+      try {
+        if (msg.method === 'status') {
+          const win = activeProjectWin();
+          return reply(200, { result: { active: win ? projectWins.get(win.id) || null : null, open: [...projectWins.values()], version: app.getVersion() } });
+        }
+        const win = activeProjectWin();
+        if (!win) throw new Error("Aucun projet n'est ouvert dans MaxyStudio.");
+        if (msg.method === 'screenshot') {
+          const r = await askRenderer(win, 'viewRect', {});
+          const img = await win.webContents.capturePage(r.rect);
+          return reply(200, { result: { png: img.toPNG().toString('base64'), view: r.view } });
+        }
+        if (!['play', 'stop', 'console'].includes(msg.method)) throw new Error('Méthode inconnue.');
+        reply(200, { result: await askRenderer(win, msg.method, msg.params || {}) });
+      } catch (e) { reply(200, { error: e.message || String(e) }); }
+    });
+  });
+  server.listen(0, '127.0.0.1', () => {
+    const info = { port: server.address().port, token, recent: recentFile(), pid: process.pid };
+    try { fs.writeFileSync(bridgeFile(), JSON.stringify(info), { mode: 0o600 }); } catch (e) { console.warn('bridge', e); }
+  });
+  app.on('will-quit', () => { try { const b = JSON.parse(fs.readFileSync(bridgeFile(), 'utf8')); if (b.pid === process.pid) fs.unlinkSync(bridgeFile()); } catch { /* déjà supprimé */ } });
+}
+// Commande que l'assistant lance : MaxyStudio lui-même en mode Node, avec mcp-server.js
+function mcpCommand() {
+  const script = path.join(ROOT, 'mcp-server.js');
+  const args = app.isPackaged ? [script] : [script];
+  return { command: process.execPath, args, env: { ELECTRON_RUN_AS_NODE: '1', MAXY_BRIDGE: bridgeFile() } };
+}
+function aiTargets() {
+  const home = os.homedir();
+  const list = [];
+  // Claude Desktop (installation classique ou Microsoft Store)
+  let claude = null;
+  if (process.platform === 'win32') {
+    const pk = path.join(process.env.LOCALAPPDATA || '', 'Packages');
+    let store = null;
+    try { store = fs.readdirSync(pk).find(n => /^Claude_/i.test(n)); } catch { /* pas de paquets */ }
+    if (store) claude = path.join(pk, store, 'LocalCache', 'Roaming', 'Claude', 'claude_desktop_config.json');
+    else if (fs.existsSync(path.join(process.env.APPDATA || '', 'Claude'))) claude = path.join(process.env.APPDATA, 'Claude', 'claude_desktop_config.json');
+  } else if (process.platform === 'darwin') {
+    const d = path.join(home, 'Library', 'Application Support', 'Claude');
+    if (fs.existsSync(d)) claude = path.join(d, 'claude_desktop_config.json');
+  } else {
+    const d = path.join(home, '.config', 'Claude');
+    if (fs.existsSync(d)) claude = path.join(d, 'claude_desktop_config.json');
+  }
+  list.push({ id: 'claude', label: 'Claude Desktop', file: claude, kind: 'json', note: 'Redémarre Claude Desktop pour voir les outils MaxyStudio.' });
+  // Codex (OpenAI, inclus avec ChatGPT Plus)
+  let codexInstalled = fs.existsSync(path.join(home, '.codex'));
+  if (!codexInstalled && process.platform === 'win32') { try { codexInstalled = fs.readdirSync(path.join(process.env.LOCALAPPDATA || '', 'Packages')).some(n => /^OpenAI\.Codex_/i.test(n)); } catch { /* rien */ } }
+  if (!codexInstalled && process.platform === 'darwin') codexInstalled = fs.existsSync('/Applications/Codex.app');
+  list.push({ id: 'codex', label: 'Codex (ChatGPT)', file: codexInstalled ? path.join(process.env.CODEX_HOME || path.join(home, '.codex'), 'config.toml') : null, kind: 'toml', note: 'Redémarre Codex pour voir les outils MaxyStudio.' });
+  // Antigravity (Google, Gemini)
+  const ag = path.join(home, '.gemini', 'config');
+  list.push({ id: 'antigravity', label: 'Antigravity (Gemini)', file: fs.existsSync(path.join(home, '.gemini', 'antigravity')) || fs.existsSync(ag) ? path.join(ag, 'mcp_config.json') : null, kind: 'json', note: 'Redémarre Antigravity pour voir les outils MaxyStudio.' });
+  return list;
+}
+function aiConnected(t) {
+  if (!t.file || !fs.existsSync(t.file)) return false;
+  try {
+    const txt = fs.readFileSync(t.file, 'utf8');
+    return t.kind === 'toml' ? /\[mcp_servers\.maxystudio\]/.test(txt) : !!(JSON.parse(txt).mcpServers || {}).maxystudio;
+  } catch { return false; }
+}
+const tomlStr = s => "'" + String(s).replace(/'/g, "''") + "'";
+function connectAi(id) {
+  const t = aiTargets().find(x => x.id === id);
+  if (!t || !t.file) throw new Error(`${t ? t.label : 'Cet assistant'} n'est pas installé sur cet ordinateur.`);
+  const cmd = mcpCommand();
+  fs.mkdirSync(path.dirname(t.file), { recursive: true });
+  const old = fs.existsSync(t.file) ? fs.readFileSync(t.file, 'utf8') : '';
+  if (old) fs.writeFileSync(t.file + '.avant-maxystudio.bak', old);
+  if (t.kind === 'toml') {
+    if (old.includes("\0")) throw new Error('Fichier de configuration illisible.');
+    const block = `[mcp_servers.maxystudio]\ncommand = ${tomlStr(cmd.command)}\nargs = [${cmd.args.map(tomlStr).join(', ')}]\nenv = { ELECTRON_RUN_AS_NODE = '1', MAXY_BRIDGE = ${tomlStr(cmd.env.MAXY_BRIDGE)} }\n`;
+    const cleaned = old.replace(/\n?\[mcp_servers\.maxystudio\][\s\S]*?(?=\n\[|$)/, '').replace(/\s+$/, '');
+    fs.writeFileSync(t.file, (cleaned ? cleaned + '\n\n' : '') + block);
+  } else {
+    let cfg = {};
+    if (old.trim()) { try { cfg = JSON.parse(old); } catch { throw new Error(`Le fichier de configuration de ${t.label} n'est pas un JSON valide : rien n'a été modifié (${t.file}).`); } }
+    cfg.mcpServers = cfg.mcpServers || {};
+    cfg.mcpServers.maxystudio = { command: cmd.command, args: cmd.args, env: cmd.env };
+    fs.writeFileSync(t.file, JSON.stringify(cfg, null, 2));
+  }
+  return { ok: true, label: t.label, file: t.file, note: t.note };
+}
+function disconnectAi(id) {
+  const t = aiTargets().find(x => x.id === id);
+  if (!t || !t.file || !fs.existsSync(t.file)) return { ok: true };
+  const old = fs.readFileSync(t.file, 'utf8');
+  if (t.kind === 'toml') fs.writeFileSync(t.file, old.replace(/\n?\[mcp_servers\.maxystudio\][\s\S]*?(?=\n\[|$)/, '').replace(/\s+$/, '') + '\n');
+  else { const cfg = JSON.parse(old); if (cfg.mcpServers) delete cfg.mcpServers.maxystudio; fs.writeFileSync(t.file, JSON.stringify(cfg, null, 2)); }
+  return { ok: true };
+}
+ipcMain.handle('ai:list', () => aiTargets().map(t => ({ id: t.id, label: t.label, installed: !!t.file, connected: aiConnected(t), file: t.file })));
+ipcMain.handle('ai:connect', (_e, id) => connectAi(id));
+ipcMain.handle('ai:disconnect', (_e, id) => disconnectAi(id));
+ipcMain.handle('ai:config', () => { const c = mcpCommand(); return JSON.stringify({ mcpServers: { maxystudio: c } }, null, 2); });
+
 // ---------- Éditeurs de code externes (VS Code, VS Code Insiders, Visual Studio 2022) ----------
 function findEditors() {
   const out = [];
@@ -695,6 +836,7 @@ app.whenReady().then(async () => {
   await migrateFromScratchCodeStudio().catch(() => {});
   registerProtocol();
   Menu.setApplicationMenu(null);
+  startBridge();
   const arg = process.argv.slice(1).find(a => /\.(maxycode|scratchcode)$/i.test(a));
   if (!(arg && await openPathArg(arg).catch(() => false))) createHub();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createHub(); });
