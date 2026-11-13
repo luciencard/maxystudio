@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jeu</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0d0f14; overflow: hidden; }
+    /* Le jeu reste invisible tant que le moteur démarre : on ne voit jamais son projet de départ. */
+    iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: #000; visibility: hidden; }
+    iframe.ready { visibility: visible; }
+    #load { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center; padding: 20px; color: #fff; text-align: center;
+      font: 400 15px/1.45 "Segoe UI", system-ui, sans-serif; background: #0d0f14; transition: opacity .35s; }
+    #load.gone { opacity: 0; pointer-events: none; }
+    .box { display: grid; justify-items: center; gap: 14px; width: min(420px, 100%); }
+    h1 { margin: 0; font: 700 clamp(22px, 4vw, 32px)/1.15 "Segoe UI", system-ui, sans-serif; }
+    #step { color: #c9cde0; min-height: 1.45em; }
+    .bar { position: relative; width: 100%; height: 12px; border: 2px solid #fff; border-radius: 5px; overflow: hidden; }
+    .bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: #ffcf3a; transition: width .25s; }
+    #load.error #step { color: #ff9aa5; }
+    #made { position: fixed; bottom: 14px; left: 0; right: 0; font-size: 12px; color: #7d8299; }
+  </style>
+</head>
+<body>
+  <div id="load">
+    <div class="box">
+      <h1 id="title"></h1>
+      <div id="step">Préparation du jeu…</div>
+      <div class="bar"><i id="fill"></i></div>
+    </div>
+    <div id="made">Fait avec MaxyStudio · F11 : plein écran</div>
+  </div>
+  <script type="module">
+    // Lanceur d'un jeu exporté par MaxyStudio : le jeu (game.maxycode) est à côté de cette page.
+    import { runGame } from '/site/player.js';
+    const $ = id => document.getElementById(id);
+    let shown = 0;
+    const status = (text, pct) => {
+      if (text) $('step').textContent = text;
+      if (pct != null) { shown = Math.max(shown, Math.min(100, Math.round(pct))); $('fill').style.width = `${shown}%`; }
+    };
+    try {
+      const info = await (await fetch('/game.json')).json();
+      document.title = info.name || 'Jeu';
+      $('title').textContent = info.name || '';
+      status('Ouverture du jeu…', 5);
+      const archive = new Uint8Array(await (await fetch('/game.maxycode')).arrayBuffer());
+      const frame = document.createElement('iframe');
+      frame.allow = 'fullscreen; autoplay; gamepad';
+      document.body.appendChild(frame);
+      await runGame(frame, 'jeu', archive, (level, text) => console[level === 'error' ? 'error' : 'log'](text), (text, f) => status(text, 5 + f * 95));
+      frame.classList.add('ready');
+      frame.focus();
+      setTimeout(() => { $('load').classList.add('gone'); setTimeout(() => $('load').remove(), 400); }, 250);
+    } catch (err) {
+      console.error(err);
+      $('load').classList.add('error');
+      status(err.message || "Le jeu n'a pas pu démarrer.");
+    }
+  </script>
+</body>
+</html>

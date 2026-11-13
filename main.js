@@ -303,11 +303,49 @@ async function configFile(dir) {
   return fs.existsSync(cfg) ? cfg : old;
 }
 
+/**
+ * Les scripts MaxyCode s'appellent maintenant .mc (avant : .sc). À l'ouverture, les .sc du projet sont renommés
+ * et leurs références mises à jour : scripts des objets et de la scène (.scene, .prefab) et lignes import [...].
+ */
+async function migrateScriptsToMc(dir) {
+  const files = [];
+  const walk = async rel => {
+    for (const e of await fsp.readdir(path.join(dir, rel), { withFileTypes: true })) {
+      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) await walk(r); else files.push(r);
+    }
+  };
+  await walk('');
+  const renames = new Map();
+  for (const r of files) if (/\.sc$/i.test(r)) { const to = r.replace(/\.sc$/i, '.mc'); if (!files.includes(to)) renames.set(r, to); }
+  if (!renames.size) return 0;
+  for (const [from, to] of renames) await fsp.rename(path.join(dir, from), path.join(dir, to));
+  const fix = v => (typeof v === 'string' ? (renames.get(v) || v) : Array.isArray(v) ? v.map(fix) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fix(x)])) : v);
+  const after = files.map(r => renames.get(r) || r);
+  for (const r of after) {
+    const full = path.join(dir, r);
+    if (/\.(scene|prefab)$/i.test(r)) {
+      try {
+        const txt = await fsp.readFile(full, 'utf8');
+        const out = JSON.stringify(fix(JSON.parse(txt)), null, 2);
+        if (out !== JSON.stringify(JSON.parse(txt), null, 2)) await fsp.writeFile(full, out);
+      } catch { /* fichier illisible : laissé tel quel */ }
+    } else if (/\.mc$/i.test(r)) {
+      let txt = await fsp.readFile(full, 'utf8'), changed = false;
+      for (const [from, to] of renames) if (txt.includes(from)) { txt = txt.split(from).join(to); changed = true; }
+      if (changed) await fsp.writeFile(full, txt);
+    }
+  }
+  return renames.size;
+}
+
 async function readProject(dir) {
   const cfgPath = await configFile(dir);
   if (!fs.existsSync(cfgPath)) throw new Error('Ce dossier ne contient pas de projet MaxyStudio (project.maxycode).');
   let config = JSON.parse(await fsp.readFile(cfgPath, 'utf8'));
   config = await migrate(dir, config);
+  await migrateScriptsToMc(dir).catch(e => console.warn('migration .mc', e));
   openDirs.add(dir);
   return { dir, config, tree: await listTree(dir), assetBase: `app://studio/project/${encDir(dir)}/` };
 }
@@ -536,6 +574,90 @@ ipcMain.handle('project:export', async (e, dir, name) => {
   return r.filePath;
 });
 ipcMain.handle('play:archive', (_e, dir, spec) => buildPlayArchive(dir, spec));
+
+// ---------- Export du jeu en application (Windows .exe, macOS .app, Linux) ----------
+// Le moteur Electron de MaxyStudio est réutilisé : le jeu tourne hors ligne, sans rien installer.
+function copyTree(from, to) {
+  // Copie fichier par fichier : marche aussi depuis l'archive app.asar de MaxyStudio
+  fs.mkdirSync(to, { recursive: true });
+  for (const e of fs.readdirSync(from, { withFileTypes: true })) {
+    const a = path.join(from, e.name), b = path.join(to, e.name);
+    if (e.isDirectory()) copyTree(a, b); else fs.writeFileSync(b, fs.readFileSync(a));
+  }
+}
+async function exportGame(win, dir) {
+  const cfg = JSON.parse(await fsp.readFile(path.join(dir, CFG), 'utf8'));
+  const name = String(cfg.name || 'Jeu').trim() || 'Jeu';
+  const safe = safeName(name) || 'Jeu';
+  // MAXY_EXPORT_DIR : tests automatiques uniquement (pas de fenêtre de choix)
+  const r = process.env.MAXY_EXPORT_DIR ? { canceled: false, filePaths: [process.env.MAXY_EXPORT_DIR] } : await dialog.showOpenDialog(win, { title: `Où créer le jeu « ${name} » ?`, defaultPath: app.getPath('desktop'), properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const plat = process.platform;
+  const folder = path.join(r.filePaths[0], plat === 'darwin' ? `${safe} (macOS)` : plat === 'win32' ? `${safe} (Windows)` : `${safe} (Linux)`);
+  if (fs.existsSync(folder)) await fsp.rm(folder, { recursive: true, force: true });
+  const send = (text, pct) => { if (!win.isDestroyed()) win.webContents.send('export:progress', text, pct); };
+  let appDir, launcher;
+  send('Copie du moteur…', 5);
+  if (plat === 'darwin') {
+    const bundle = path.resolve(process.execPath, '..', '..', '..');
+    const out = path.join(folder, `${safe}.app`);
+    await fsp.mkdir(folder, { recursive: true });
+    const prev = process.noAsar; process.noAsar = true;
+    try { await fsp.cp(bundle, out, { recursive: true, verbatimSymlinks: true, filter: src => !/\/Contents\/Resources\/(app\.asar|app\.asar\.unpacked|default_app\.asar)$/.test(src) }); }
+    finally { process.noAsar = prev; }
+    const plist = path.join(out, 'Contents', 'Info.plist');
+    if (fs.existsSync(plist)) {
+      let p = await fsp.readFile(plist, 'utf8');
+      p = p.replace(/(<key>CFBundle(?:Display)?Name<\/key>\s*<string>)[^<]*/g, `$1${name.replace(/[<&]/g, '')}`).replace(/(<key>CFBundleIdentifier<\/key>\s*<string>)[^<]*/, `$1com.maxygame.${safe.toLowerCase().replace(/[^a-z0-9]+/g, '')}`);
+      await fsp.writeFile(plist, p);
+    }
+    appDir = path.join(out, 'Contents', 'Resources', 'app');
+    launcher = out;
+  } else {
+    const exeDir = path.dirname(process.execPath);
+    await fsp.mkdir(folder, { recursive: true });
+    // Les .asar ne doivent pas être ouverts comme des dossiers pendant la copie ; resources/ (MaxyStudio lui-même) n'est pas copié
+    const prev = process.noAsar; process.noAsar = true;
+    try {
+      for (const e of await fsp.readdir(exeDir, { withFileTypes: true })) {
+        if (e.name === 'resources' || /^Uninstall/i.test(e.name)) continue;
+        await fsp.cp(path.join(exeDir, e.name), path.join(folder, e.name), { recursive: true });
+      }
+    } finally { process.noAsar = prev; }
+    const exe = path.basename(process.execPath);
+    launcher = path.join(folder, plat === 'win32' ? `${safe}.exe` : safe);
+    await fsp.rename(path.join(folder, exe), launcher);
+    if (plat !== 'win32') await fsp.chmod(launcher, 0o755);
+    appDir = path.join(folder, 'resources', 'app');
+  }
+  send('Copie du lecteur de jeu…', 55);
+  const www = path.join(appDir, 'www');
+  for (const d of ['assets', 'lib', 'icons']) copyTree(path.join(ROOT, 'engine', d), path.join(www, d));
+  fs.writeFileSync(path.join(www, 'moteur.html'), fs.readFileSync(path.join(ROOT, 'engine', 'index.html')));
+  fs.writeFileSync(path.join(www, 'favicon.svg'), fs.readFileSync(path.join(ROOT, 'engine', 'favicon.svg')));
+  fs.mkdirSync(path.join(www, 'studio'), { recursive: true });
+  for (const f of ['sc3d-core.js', 'sc3d-ext.js', 'scui-ext.js', 'maxycode.js', 'maxyjs.js']) fs.writeFileSync(path.join(www, 'studio', f), fs.readFileSync(path.join(UI_DIR, f)));
+  fs.mkdirSync(path.join(www, 'three', 'build'), { recursive: true });
+  fs.writeFileSync(path.join(www, 'three', 'build', 'three.module.min.js'), fs.readFileSync(path.join(THREE_DIR, 'build', 'three.module.min.js')));
+  copyTree(path.join(ROOT, 'vendor', 'three-addons'), path.join(www, 'three', 'examples', 'jsm'));
+  copyTree(path.join(ROOT, 'export', 'www'), www);
+  send('Ajout de ton jeu…', 80);
+  const entries = {};
+  for (const rel of await walkFiles(dir)) {
+    if (/\.sb3$/i.test(rel) || /^(types\/|jsconfig\.json$)/.test(rel)) continue;
+    entries[rel] = await fsp.readFile(path.join(dir, rel));
+  }
+  fs.writeFileSync(path.join(www, 'game.maxycode'), createZipBuffer(entries));
+  fs.writeFileSync(path.join(www, 'game.json'), JSON.stringify({ name, type: cfg.type, madeWith: `MaxyStudio ${app.getVersion()}` }, null, 2));
+  fs.writeFileSync(path.join(appDir, 'main.js'), fs.readFileSync(path.join(ROOT, 'export', 'app-main.js')));
+  fs.writeFileSync(path.join(appDir, 'package.json'), JSON.stringify({ name: safe.toLowerCase().replace(/[^a-z0-9-]+/g, '-') || 'jeu', productName: name, version: '1.0.0', main: 'main.js', private: true }, null, 2));
+  send('Terminé.', 100);
+  return { folder, launcher };
+}
+ipcMain.handle('export:game', async (e, dir) => {
+  if (!openDirs.has(dir)) throw new Error('Projet non ouvert.');
+  return exportGame(BrowserWindow.fromWebContents(e.sender), dir);
+});
 ipcMain.handle('assets:import', async (e, dir, folder) => {
   const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender), {
     title: 'Importer des assets', properties: ['openFile', 'multiSelections'],

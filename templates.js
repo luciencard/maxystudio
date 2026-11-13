@@ -15,7 +15,7 @@ const SVG = {
 };
 
 function sprite(name, extra) {
-  return Object.assign({ id: id(), name, kind: 'sprite', x: 0, y: 0, size: 100, direction: 90, visible: true, rotationStyle: 'all around', draggable: false, costumes: [], sounds: [], script: `scripts/${name}.sc` }, extra);
+  return Object.assign({ id: id(), name, kind: 'sprite', x: 0, y: 0, size: 100, direction: 90, visible: true, rotationStyle: 'all around', draggable: false, costumes: [], sounds: [], script: `scripts/${name}.mc` }, extra);
 }
 function obj(kind, name, extra) {
   const o = {
@@ -47,17 +47,17 @@ const T2D = {
   }),
   plateforme: () => ({
     'assets/Joueur.svg': SVG.joueur, 'assets/Fond.svg': SVG.fondJour,
-    'scripts/Scène.sc': 'when app run\nset [niveau v] to (1)\n',
-    'scripts/Joueur.sc': 'when app run\ngo to x: (-180) y: (-110)\nset [vy v] to (0)\nforever\n    change [vy v] by (-1)\n    change y by (vy)\n    if <(y position) < (-110)> then\n        set y to (-110)\n        set [vy v] to (0)\n        if <key (up arrow v) pressed?> then\n            set [vy v] to (14)\n        end\n    end\n    if <key (right arrow v) pressed?> then\n        change x by (6)\n    end\n    if <key (left arrow v) pressed?> then\n        change x by (-6)\n    end\nend\n',
-    'scenes/Main.scene': scene('2d', { stage: { backdrops: ['assets/Fond.svg'], script: 'scripts/Scène.sc' }, objects: [sprite('Joueur', { x: -180, y: -110, costumes: ['assets/Joueur.svg'] })] })
+    'scripts/Scène.mc': 'when app run\nset [niveau v] to (1)\n',
+    'scripts/Joueur.mc': 'when app run\ngo to x: (-180) y: (-110)\nset [vy v] to (0)\nforever\n    change [vy v] by (-1)\n    change y by (vy)\n    if <(y position) < (-110)> then\n        set y to (-110)\n        set [vy v] to (0)\n        if <key (up arrow v) pressed?> then\n            set [vy v] to (14)\n        end\n    end\n    if <key (right arrow v) pressed?> then\n        change x by (6)\n    end\n    if <key (left arrow v) pressed?> then\n        change x by (-6)\n    end\nend\n',
+    'scenes/Main.scene': scene('2d', { stage: { backdrops: ['assets/Fond.svg'], script: 'scripts/Scène.mc' }, objects: [sprite('Joueur', { x: -180, y: -110, costumes: ['assets/Joueur.svg'] })] })
   }),
   arcade: () => ({
     'assets/Vaisseau.svg': SVG.vaisseau, 'assets/Laser.svg': SVG.laser, 'assets/Espace.svg': SVG.fondEspace,
-    'scripts/Scène.sc': 'when app run\nset [score v] to (0)\n',
-    'scripts/Vaisseau.sc': 'when app run\ngo to x: (0) y: (-130)\nforever\n    set x to (mouse x)\n    if <mouse down?> then\n        broadcast [tirer v]\n        wait (0.25) seconds\n    end\nend\n',
-    'scripts/Laser.sc': 'when app run\nhide\n\nwhen I receive [tirer v]\ncreate clone of (myself v)\n\nwhen I start as a clone\ngo to (Vaisseau v)\nshow\nrepeat until <(y position) > (170)>\n    change y by (15)\nend\ndelete this clone\n',
+    'scripts/Scène.mc': 'when app run\nset [score v] to (0)\n',
+    'scripts/Vaisseau.mc': 'when app run\ngo to x: (0) y: (-130)\nforever\n    set x to (mouse x)\n    if <mouse down?> then\n        broadcast [tirer v]\n        wait (0.25) seconds\n    end\nend\n',
+    'scripts/Laser.mc': 'when app run\nhide\n\nwhen I receive [tirer v]\ncreate clone of (myself v)\n\nwhen I start as a clone\ngo to (Vaisseau v)\nshow\nrepeat until <(y position) > (170)>\n    change y by (15)\nend\ndelete this clone\n',
     'scenes/Main.scene': scene('2d', {
-      stage: { backdrops: ['assets/Espace.svg'], script: 'scripts/Scène.sc' },
+      stage: { backdrops: ['assets/Espace.svg'], script: 'scripts/Scène.mc' },
       objects: [sprite('Vaisseau', { y: -130, costumes: ['assets/Vaisseau.svg'] }), sprite('Laser', { visible: false, costumes: ['assets/Laser.svg'] })]
     })
   })
@@ -80,17 +80,17 @@ const T3D = {
     const plats = [[4, 1, -3, '#ff8c1a'], [8, 2.2, -7, '#4c97ff'], [3, 3.4, -12, '#59c059'], [-3, 4.6, -10, '#cf63cf']];
     const coins = [[4, 2.3, -3], [8, 3.5, -7], [3, 4.7, -12], [-3, 5.9, -10], [-6, 0.9, 2]];
     return {
-      'scripts/Monde.sc': 'when app run\nset [pièces v] to (0)\n\nwhen I receive [gagné v]\nshow message [Bravo, tu as ramassé les 5 pièces !]\n',
-      'scripts/Joueur.sc': 'when app run\nturn physics [on v]\ncamera follow [myself] distance (7) height (3.5)\nshow message [Ramasse les 5 pièces. Flèches ou ZQSD pour bouger, espace pour sauter.]\nforever\n    rotate by x: (0) y: ((axis [horizontal v]) * (-3)) z: (0) degrees\n    move forward ((axis [vertical v]) * (0.12))\n    if <key (space v) pressed?> then\n        jump with force (6.5)\n    end\n    if <([y position v] of object [myself]) < (-10)> then\n        set position to x: (0) y: (2) z: (0)\n    end\nend\n',
-      'scripts/Pièce.sc': 'when app run\nshow object [myself]\nforever\n    rotate by x: (0) y: (4) z: (0) degrees\nend\n\nwhen this object touches [Joueur]\nhide object [myself]\nchange [pièces v] by (1)\nif <(pièces) = (5)> then\n    broadcast [gagné v]\nend\n',
+      'scripts/Monde.mc': 'when app run\nset [pièces v] to (0)\n\nwhen I receive [gagné v]\nshow message [Bravo, tu as ramassé les 5 pièces !]\n',
+      'scripts/Joueur.mc': 'when app run\nturn physics [on v]\ncamera follow [myself] distance (7) height (3.5)\nshow message [Ramasse les 5 pièces. Flèches ou ZQSD pour bouger, espace pour sauter.]\nforever\n    rotate by x: (0) y: ((axis [horizontal v]) * (-3)) z: (0) degrees\n    move forward ((axis [vertical v]) * (0.12))\n    if <key (space v) pressed?> then\n        jump with force (6.5)\n    end\n    if <([y position v] of object [myself]) < (-10)> then\n        set position to x: (0) y: (2) z: (0)\n    end\nend\n',
+      'scripts/Pièce.mc': 'when app run\nshow object [myself]\nforever\n    rotate by x: (0) y: (4) z: (0) degrees\nend\n\nwhen this object touches [Joueur]\nhide object [myself]\nchange [pièces v] by (1)\nif <(pièces) = (5)> then\n    broadcast [gagné v]\nend\n',
       'scenes/Main.scene': scene('3d', {
-        environment: env({ fog: { enabled: true, near: 30, far: 90 } }), worldScript: 'scripts/Monde.sc',
+        environment: env({ fog: { enabled: true, near: 30, far: 90 } }), worldScript: 'scripts/Monde.mc',
         objects: [
           camera([0, 4, 9], [-18, 0, 0]),
           obj('plane', 'Sol', { scale: [40, 1, 40], mesh: { color: '#79c06a' } }),
-          obj('capsule', 'Joueur', { position: [0, 1, 0], script: 'scripts/Joueur.sc', rigidbody: { enabled: true }, mesh: { color: '#ff6680' } }),
+          obj('capsule', 'Joueur', { position: [0, 1, 0], script: 'scripts/Joueur.mc', rigidbody: { enabled: true }, mesh: { color: '#ff6680' } }),
           ...plats.map(([x, y, z, c], i) => obj('cube', `Plateforme ${i + 1}`, { position: [x, y, z], scale: [3, 0.5, 3], mesh: { color: c } })),
-          ...coins.map(([x, y, z], i) => obj('torus', `Pièce ${i + 1}`, { position: [x, y, z], script: 'scripts/Pièce.sc', collider: false, mesh: { color: '#ffcc33', metalness: 0.6, roughness: 0.3 } })),
+          ...coins.map(([x, y, z], i) => obj('torus', `Pièce ${i + 1}`, { position: [x, y, z], script: 'scripts/Pièce.mc', collider: false, mesh: { color: '#ffcc33', metalness: 0.6, roughness: 0.3 } })),
           obj('light', 'Lampe', { position: [-6, 3, 2], light: { color: '#ffd28a', intensity: 3, range: 10 } })
         ]
       })
@@ -99,16 +99,16 @@ const T3D = {
   fps: () => {
     const targets = [[-4, 1, -8], [0, 2, -12], [4, 1, -8], [7, 3, -14], [-7, 3, -14]];
     return {
-      'scripts/Monde.sc': 'when app run\nset [cibles v] to (0)\nshow message [Clique sur la scène pour viser à la souris. Clique sur les cibles !]\n\nwhen stage clicked\nlock mouse pointer\n',
-      'scripts/Joueur.sc': 'when app run\nturn physics [on v]\nfirst person camera on [myself] eye height (1.6)\nforever\n    move forward ((axis [vertical v]) * (0.12))\n    move sideways ((axis [horizontal v]) * (0.1))\n    if <key (space v) pressed?> then\n        jump with force (6)\n    end\nend\n',
-      'scripts/Cible.sc': 'when app run\nshow object [myself]\n\nwhen this object clicked\nhide object [myself]\nchange [cibles v] by (1)\nshow message (join [Cibles touchées : ] (cibles))\n',
+      'scripts/Monde.mc': 'when app run\nset [cibles v] to (0)\nshow message [Clique sur la scène pour viser à la souris. Clique sur les cibles !]\n\nwhen stage clicked\nlock mouse pointer\n',
+      'scripts/Joueur.mc': 'when app run\nturn physics [on v]\nfirst person camera on [myself] eye height (1.6)\nforever\n    move forward ((axis [vertical v]) * (0.12))\n    move sideways ((axis [horizontal v]) * (0.1))\n    if <key (space v) pressed?> then\n        jump with force (6)\n    end\nend\n',
+      'scripts/Cible.mc': 'when app run\nshow object [myself]\n\nwhen this object clicked\nhide object [myself]\nchange [cibles v] by (1)\nshow message (join [Cibles touchées : ] (cibles))\n',
       'scenes/Main.scene': scene('3d', {
-        environment: env({ skyTop: '#2f3b63', skyBottom: '#f0a868', ambient: 0.45, sun: { color: '#ffd9a8', intensity: 1.3, direction: [0.7, -0.6, 0.3] } }), worldScript: 'scripts/Monde.sc',
+        environment: env({ skyTop: '#2f3b63', skyBottom: '#f0a868', ambient: 0.45, sun: { color: '#ffd9a8', intensity: 1.3, direction: [0.7, -0.6, 0.3] } }), worldScript: 'scripts/Monde.mc',
         objects: [
           obj('plane', 'Sol', { scale: [50, 1, 50], mesh: { color: '#8a8f99' } }),
-          obj('capsule', 'Joueur', { position: [0, 1, 4], rotation: [0, 180, 0], script: 'scripts/Joueur.sc', rigidbody: { enabled: true }, mesh: { color: '#4c97ff' } }),
+          obj('capsule', 'Joueur', { position: [0, 1, 4], rotation: [0, 180, 0], script: 'scripts/Joueur.mc', rigidbody: { enabled: true }, mesh: { color: '#4c97ff' } }),
           obj('cube', 'Mur', { position: [0, 1.5, -18], scale: [30, 3, 1], mesh: { color: '#b7a07a' } }),
-          ...targets.map(([x, y, z], i) => obj('cylinder', `Cible ${i + 1}`, { position: [x, y, z], rotation: [90, 0, 0], scale: [1.2, 0.2, 1.2], script: 'scripts/Cible.sc', mesh: { color: '#ff4d4d' } }))
+          ...targets.map(([x, y, z], i) => obj('cylinder', `Cible ${i + 1}`, { position: [x, y, z], rotation: [90, 0, 0], scale: [1.2, 0.2, 1.2], script: 'scripts/Cible.mc', mesh: { color: '#ff4d4d' } }))
         ]
       })
     };
@@ -123,9 +123,9 @@ const TAPP = {
     'scenes/Main.scene': scene('app', { stage: { backdrops: ['assets/Fond.svg'], script: '' }, objects: [] })
   }),
   quiz: () => ({
-    'scripts/App.sc': 'when app run\nset [score v] to (0)\nset app background to [#eef7ff]\nadd title [titre] text [Quiz des capitales]\nadd label [question] text [Quelle est la capitale du Japon ?]\nadd button [r1] text [Kyoto]\nadd button [r2] text [Tokyo]\nadd button [r3] text [Osaka]\nadd label [résultat] text [ ]\n\nwhen button [r2] clicked\nchange [score v] by (1)\nset text of [résultat] to [Bonne réponse !]\nshow notification (join [Score : ] (score))\n\nwhen button [r1] clicked\nset text of [résultat] to [Non, essaie encore.]\n\nwhen button [r3] clicked\nset text of [résultat] to [Non, essaie encore.]\n',
+    'scripts/App.mc': 'when app run\nset [score v] to (0)\nset app background to [#eef7ff]\nadd title [titre] text [Quiz des capitales]\nadd label [question] text [Quelle est la capitale du Japon ?]\nadd button [r1] text [Kyoto]\nadd button [r2] text [Tokyo]\nadd button [r3] text [Osaka]\nadd label [résultat] text [ ]\n\nwhen button [r2] clicked\nchange [score v] by (1)\nset text of [résultat] to [Bonne réponse !]\nshow notification (join [Score : ] (score))\n\nwhen button [r1] clicked\nset text of [résultat] to [Non, essaie encore.]\n\nwhen button [r3] clicked\nset text of [résultat] to [Non, essaie encore.]\n',
     'assets/Fond.svg': SVG.fondBlanc,
-    'scenes/Main.scene': scene('app', { stage: { backdrops: ['assets/Fond.svg'], script: 'scripts/App.sc' }, objects: [] })
+    'scenes/Main.scene': scene('app', { stage: { backdrops: ['assets/Fond.svg'], script: 'scripts/App.mc' }, objects: [] })
   })
 };
 
@@ -181,7 +181,7 @@ Ce dossier est un projet **MaxyStudio** : des blocs Scratch écrits en texte, da
 ## Structure
 - \`project.maxycode\` : configuration du projet (JSON)
 - \`scenes/Main.scene\` : les objets de la scène (position, couleur, script...)
-- \`scripts/<Nom>.sc\` : le code d'un objet. Plusieurs objets peuvent partager le même script.
+- \`scripts/<Nom>.mc\` : le code d'un objet. Plusieurs objets peuvent partager le même script.
 - \`assets/\` : modèles 3D (.glb, .gltf, .obj, .fbx, .stl, .ply, .dae), images et sons importés
 
 MaxyStudio surveille ce dossier : une modification faite par un autre outil (éditeur, assistant IA) est rechargée automatiquement.
@@ -195,7 +195,7 @@ Pour partager le projet, utilise Fichier > Exporter : tout le dossier devient un
 - Blocs personnalisés : \`define sauter (hauteur)\` puis \`sauter (10)\`. \`define!\` = sans rafraîchissement d'écran.
 - Fonctions qui renvoient une valeur (MaxyCode) : dans un \`define\`, \`return (valeur)\` renvoie un résultat. On appelle la fonction dans une expression : \`set [aire v] to (carre (5))\`, \`say (salut [Maxy])\`, \`if <(fib (6)) = (8)> then\`. La récursion marche (une fonction peut s'appeler elle-même). Une fonction qui renvoie une valeur s'exécute d'un coup : pas de \`wait\` dedans, et pas d'appel dans \`repeat until\` ou \`wait until\` (range d'abord le résultat dans une variable). Une fonction n'existe que dans le script où elle est définie.
   Exemple : \`define carre (n)\` puis, à la ligne suivante, \`return ((n) * (n))\`. Une condition renvoie 1 (vrai) ou 0 (faux) : \`if <(est pair (4)) = (1)> then\`.
-- Modules (MaxyCode) : \`import [scripts/outils.sc]\`, en haut d'un script, ajoute les fonctions (\`define\`) d'un autre script du projet ; ses \`when\` sont ignorés. Une fonction déjà définie dans le script est gardée. Un module peut en importer un autre.
+- Modules (MaxyCode) : \`import [scripts/outils.mc]\`, en haut d'un script, ajoute les fonctions (\`define\`) d'un autre script du projet ; ses \`when\` sont ignorés. Une fonction déjà définie dans le script est gardée. Un module peut en importer un autre.
 - Scènes (niveaux) : Fichier > Nouvelle scène crée un niveau (scenes/Niveau 2.scene). En jeu, \`go to scene [Niveau 2]\` charge cette scène ; \`(scene name)\` donne le nom de la scène en cours. Les variables de la Scène (score, vies…) gardent leur valeur d'un niveau à l'autre : ne les remets à zéro que dans la scène de départ (Fichier > Définir comme scène de départ).
 - Prefabs : clic droit sur un objet > Créer un prefab (assets/prefabs/Nom.prefab, avec ses enfants et son script). Double-clique sur le prefab, ou glisse-le dans la scène, pour en placer une instance. Dans l'Inspecteur : Appliquer au prefab, puis Mettre à jour les instances.
 - Interface (tous les projets) : onglet Interface. Ajoute textes, boutons, images, barres et panneaux par-dessus le jeu ; le nom de l'élément sert dans les blocs : \`set text of [Score] to (join [Score : ] (score))\`, \`when button [Jouer] clicked\`, \`set bar [Vie] to (50) %\`, \`set image of [Icone] to [assets/coeur.png]\`, \`show element [Menu]\`, \`hide element [Menu]\`.

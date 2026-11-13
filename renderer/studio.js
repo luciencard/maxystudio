@@ -95,7 +95,7 @@ function kindOf(rel) {
   if (core.MODEL_EXT.includes(e)) return 'model';
   if (core.IMAGE_EXT.includes(e)) return 'image';
   if (core.SOUND_EXT.includes(e)) return 'sound';
-  if (e === 'sc' || e === 'js') return 'sc';
+  if (e === 'mc' || e === 'sc' || e === 'js') return 'sc';
   if (e === 'scene') return 'scene';
   if (e === 'prefab') return 'prefab';
   if (e === 'anim') return 'anim';
@@ -445,7 +445,8 @@ const color = (k, v) => `<input class="f" type="color" data-k="${k}" data-t="col
 const check = (k, v, text = '') => `<label class="in-check"><input type="checkbox" data-k="${k}" data-t="check"${v ? ' checked' : ''}>${text}</label>`;
 const range = (k, v, min, max, step) => `<div class="in-row2"><input type="range" data-k="${k}" data-t="range" min="${min}" max="${max}" step="${step}" value="${+v}"><span class="in-l" style="width:34px;text-align:right" data-out="${k}">${fmt(v)}</span></div>`;
 const selectF = (k, v, options) => `<select class="f" data-k="${k}" data-t="select">${options.map(([val, text]) => `<option value="${esc(val)}"${String(val) === String(v) ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select>`;
-const scriptOptions = () => [['', '(aucun)'], ...filesBy(['sc', 'js']).map(f => [f, f])];
+const isMc = rel => /\.(mc|sc)$/i.test(rel || '');
+const scriptOptions = () => [['', '(aucun)'], ...filesBy(['mc', 'sc', 'js']).map(f => [f, f])];
 
 function renderInsp() {
   const box = $('#insp');
@@ -687,7 +688,7 @@ function bindInsp(root, target, howOf, scope) {
     { label: 'Physique', ic: 'physics', disabled: target.rigidbody && target.rigidbody.enabled, fn: () => { snapshot(); target.rigidbody = { enabled: true, gravity: 1, bounce: 0 }; if (!target.collider) target.collider = true; saveScene(); renderInsp(); } },
     { label: 'Animation', ic: 'clock', disabled: !!target.animator, fn: () => addAnimTo(target) },
     { label: 'Collision', ic: 'shield', disabled: !!target.collider, fn: () => { snapshot(); target.collider = true; saveScene(); renderInsp(); } },
-    { label: 'Script existant…', ic: 'fileCode', disabled: !!target.script || !filesBy(['sc', 'js']).length, fn: () => { snapshot(); target.script = filesBy(['sc', 'js'])[0]; saveScene(); renderInsp(); renderHier(); } },
+    { label: 'Script existant…', ic: 'fileCode', disabled: !!target.script || !filesBy(['mc', 'sc', 'js']).length, fn: () => { snapshot(); target.script = filesBy(['mc', 'sc', 'js'])[0]; saveScene(); renderInsp(); renderHier(); } },
     { label: 'Nouveau script', ic: 'plus', disabled: !!target.script, fn: () => newScriptFor(target) }
   ]));
 }
@@ -960,17 +961,17 @@ async function dropAsset(rel, point, onId) {
 
 // ---------------- Scripts (onglets de code) ----------------
 async function newScript(name, code) {
-  let lang = 'sc';
-  try { lang = localStorage.getItem('studio.scriptLang') === 'js' ? 'js' : 'sc'; } catch { /* stockage indisponible */ }
+  let lang = 'mc';
+  try { lang = localStorage.getItem('studio.scriptLang') === 'js' ? 'js' : 'mc'; } catch { /* stockage indisponible */ }
   const ok = await modal('Nouveau script', `<label class="m-l">Nom</label><input class="f" id="nsName" value="${esc(name)}" spellcheck="false">
-    <label class="m-l">Langage</label><select class="f" id="nsLang"><option value="sc"${lang === 'sc' ? ' selected' : ''}>MaxyCode (blocs en texte, simple)</option><option value="js"${lang === 'js' ? ' selected' : ''}>JavaScript (le plus rapide, VS Code)</option></select>
+    <label class="m-l">Langage</label><select class="f" id="nsLang"><option value="mc"${lang === 'mc' ? ' selected' : ''}>MaxyCode (.mc, blocs en texte, simple)</option><option value="js"${lang === 'js' ? ' selected' : ''}>JavaScript (.js, le plus rapide, VS Code)</option></select>
     <p class="m-note">MaxyCode et JavaScript peuvent être mélangés dans un même jeu : ils partagent les variables de la Scène, les messages et l'interface.</p>`, { ok: 'Créer', focus: '#nsName' });
   if (!ok) return null;
   const n = $('#modalBody #nsName').value.trim();
   lang = $('#modalBody #nsLang').value;
   if (!n) return null;
   try { localStorage.setItem('studio.scriptLang', lang); } catch { /* stockage indisponible */ }
-  let rel = `scripts/${n.replace(/[<>:"/\\|?*]/g, '').replace(/\.(sc|js)$/, '')}.${lang}`;
+  let rel = `scripts/${n.replace(/[<>:"/\\|?*]/g, '').replace(/\.(mc|sc|js)$/, '')}.${lang}`;
   if (lang === 'js') { code = jsTemplate(S.type, n); await ensureJsSetup(); }
   if (allFiles().includes(rel)) { toast('Un script porte déjà ce nom : il est réutilisé.'); }
   else await writeText(rel, code);
@@ -992,7 +993,7 @@ async function openScript(rel, line) {
   if (!S.models.has(rel)) {
     let text;
     try { text = await studio.readFile(DIR, rel); } catch { return toast(`Fichier introuvable : ${rel}`, true); }
-    const lang = rel.endsWith('.sc') ? 'scratchcode' : rel.endsWith('.js') ? 'javascript' : rel.endsWith('.md') ? 'markdown' : (rel.endsWith('.json') || rel.endsWith('.maxycode') || rel.endsWith('.scratchcode') || rel.endsWith('.scene')) ? 'json' : 'plaintext';
+    const lang = isMc(rel) ? 'scratchcode' : rel.endsWith('.js') ? 'javascript' : rel.endsWith('.md') ? 'markdown' : (rel.endsWith('.json') || rel.endsWith('.maxycode') || rel.endsWith('.scratchcode') || rel.endsWith('.scene')) ? 'json' : 'plaintext';
     const model = monaco.editor.createModel(text, lang, monaco.Uri.parse('file:///' + encodeURI(rel)));
     model.onDidChangeContent(() => renderTabs());
     S.models.set(rel, model); S.saved.set(rel, text);
@@ -1385,6 +1386,21 @@ function detachPrefab(id) {
 
 
 
+// ---------------- Export du jeu en application ----------------
+async function exportGameApp() {
+  if (!studio.exportGame) return;
+  if (S.mode !== 'edit') stop();
+  await saveAll();
+  try {
+    const r = await studio.exportGame(DIR);
+    if (!r) return;
+    toast(`Jeu exporté : ${r.launcher}`);
+    log('ok', `Jeu exporté. Lance-le avec : ${r.launcher}. Pour le partager, compresse le dossier « ${r.folder} » en .zip.`);
+    studio.reveal(r.folder, '');
+  } catch (e) { toast('Export impossible : ' + cleanErr(e), true); }
+}
+if (studio.onExportProgress) studio.onExportProgress((text, pct) => status(`Export du jeu : ${text} (${pct} %)`));
+
 // ---------------- Assistants IA (MCP) ----------------
 /** Un assistant vient peut-être d'écrire sur le disque : on relit scène et scripts avant de lancer (sinon l'ancienne copie en mémoire serait réenregistrée). */
 async function syncFromDisk() {
@@ -1755,7 +1771,7 @@ function toggleBreakpoint(rel, line) {
   status(`${countBreakpoints()} point${countBreakpoints() > 1 ? 's' : ''} d'arrêt`);
 }
 function renderBreakpoints(rel) {
-  const m = S.models.get(rel); if (!m || !rel.endsWith('.sc')) return;
+  const m = S.models.get(rel); if (!m || !isMc(rel)) return;
   const lines = [...(DBG.bps.get(rel) || [])].filter(l => l <= m.getLineCount());
   DBG.decos.set(rel, m.deltaDecorations(DBG.decos.get(rel) || [], lines.map(l => ({ range: new monaco.Range(l, 1, l, 1), options: { isWholeLine: true, glyphMarginClassName: 'maxy-bp', glyphMarginHoverMessage: { value: "Point d'arrêt : clique pour le retirer" }, stickiness: 1 } }))));
 }
@@ -2013,7 +2029,7 @@ function applyMarkers(rel) {
 }
 function updateInspection() {
   const el = $('#inspection');
-  if (!S.active || !S.active.endsWith('.sc')) { el.innerHTML = ''; el.className = 'un-insp-badge'; return; }
+  if (!S.active || !isMc(S.active)) { el.innerHTML = ''; el.className = 'un-insp-badge'; return; }
   const n = (S.problems[S.active] || []).length;
   el.className = 'un-insp-badge ' + (n ? 'err' : 'ok');
   el.innerHTML = n ? `${icon('alert', 12)}<span>${n}</span>` : icon('check', 13);
@@ -2044,6 +2060,7 @@ const MENUS = {
     '-',
     { label: 'Tout enregistrer', ic: 'save', key: 'Ctrl+S', fn: saveAll },
     { label: 'Exporter le projet (.maxycode)…', ic: 'share', fn: exportProject },
+    { label: `Exporter le jeu en application (${studio.platform === 'win32' ? '.exe Windows' : studio.platform === 'darwin' ? '.app macOS' : 'Linux'})…`, ic: 'rocket', fn: exportGameApp },
     '-',
     ...(EDITORS.length
       ? EDITORS.map(ed => ({ label: `Ouvrir dans ${ed.label}`, ic: 'code', fn: () => openInEditor(ed.id) }))
@@ -2235,7 +2252,7 @@ function setupMonaco() {
   window.require(['vs/editor/editor.main'], () => {
     monaco = window.monaco;
     setupJsLanguage();
-    monaco.languages.register({ id: 'scratchcode', extensions: ['.sc'] });
+    monaco.languages.register({ id: 'scratchcode', extensions: ['.mc', '.sc'] });
     monaco.languages.setMonarchTokensProvider('scratchcode', {
       tokenizer: { root: [
         [/\/\/.*$/, 'comment'],
@@ -2276,10 +2293,10 @@ function setupMonaco() {
       theme: 'sc-dark', automaticLayout: true, fontFamily: '"JetBrains Mono", Consolas, monospace', fontSize: 14, lineHeight: 22, fontLigatures: true,
       tabSize: 4, insertSpaces: true, minimap: { enabled: false }, smoothScrolling: true, scrollBeyondLastLine: false, renderLineHighlight: 'all', model: null, glyphMargin: true
     });
-    // Clic dans la marge : point d'arrêt (scripts .sc)
+    // Clic dans la marge : point d'arrêt (scripts MaxyCode .mc)
     editor.onMouseDown(e => {
       const T = monaco.editor.MouseTargetType;
-      if ((e.target.type === T.GUTTER_GLYPH_MARGIN || e.target.type === T.GUTTER_LINE_DECORATIONS) && e.target.position && S.active && S.active.endsWith('.sc')) toggleBreakpoint(S.active, e.target.position.lineNumber);
+      if ((e.target.type === T.GUTTER_GLYPH_MARGIN || e.target.type === T.GUTTER_LINE_DECORATIONS) && e.target.position && S.active && isMc(S.active)) toggleBreakpoint(S.active, e.target.position.lineNumber);
     });
     document.fonts.load('14px "JetBrains Mono"').then(() => monaco.editor.remeasureFonts());
     editor.onDidChangeCursorPosition(e => { $('#statusCursor').textContent = `Ligne ${e.position.lineNumber}, colonne ${e.position.column}`; });

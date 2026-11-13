@@ -72,7 +72,7 @@ async function handle(msg) {
           protocolVersion: PROTOCOLS.includes(asked) ? asked : PROTOCOLS[0],
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: 'maxystudio', title: 'MaxyStudio', version: VERSION },
-          instructions: "MaxyStudio est un moteur de jeu 2D/3D (Windows, macOS, Linux). Commence par maxystudio_status puis get_guide. Les scripts sont en MaxyCode (.sc, blocs Scratch en texte) ou en JavaScript (.js, classe Maxy.Script). Utilise create_script, add_object et update_object plutôt que d'éditer les scènes à la main. Après une modification, lance run_game pour lire la console, puis screenshot pour voir le jeu."
+          instructions: "MaxyStudio est un moteur de jeu 2D/3D (Windows, macOS, Linux). Commence par maxystudio_status puis get_guide. Les scripts sont en MaxyCode (.mc, blocs Scratch en texte) ou en JavaScript (.js, classe Maxy.Script). Utilise create_script, add_object et update_object plutôt que d'éditer les scènes à la main. Après une modification, lance run_game pour lire la console, puis screenshot pour voir le jeu."
         });
       }
       case 'ping': return ok(id, {});

@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('studio', {
   openAny: () => ipcRenderer.invoke('project:openAny'),
   readProject: (dir) => ipcRenderer.invoke('project:read', dir),
   exportProject: (dir, name) => ipcRenderer.invoke('project:export', dir, name),
+  exportGame: (dir) => ipcRenderer.invoke('export:game', dir),
+  onExportProgress: (cb) => ipcRenderer.on('export:progress', (_e, text, pct) => cb(text, pct)),
   playArchive: (dir, spec) => ipcRenderer.invoke('play:archive', dir, spec),
   importAssets: (dir, folder) => ipcRenderer.invoke('assets:import', dir, folder),
   importPaths: (dir, folder, paths) => ipcRenderer.invoke('assets:importPaths', dir, folder, paths),

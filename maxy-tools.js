@@ -6,7 +6,7 @@ const fsp = fs.promises;
 const path = require('path');
 
 const CFG = 'project.maxycode';
-const TEXT_EXT = /\.(sc|js|json|scene|prefab|anim|md|txt|maxycode|ts|svg|css|html)$/i;
+const TEXT_EXT = /\.(mc|sc|js|json|scene|prefab|anim|md|txt|maxycode|ts|svg|css|html)$/i;
 const JSON_EXT = /\.(json|scene|prefab|anim|maxycode)$/i;
 const SHAPES = ['cube', 'sphere', 'cylinder', 'cone', 'capsule', 'plane', 'torus'];
 const KINDS_3D = [...SHAPES, 'empty', 'light', 'camera', 'model', 'terrain', 'particles'];
@@ -137,9 +137,9 @@ const TOOLS = [
   { name: 'get_guide', description: "Guide complet de MaxyStudio : syntaxe MaxyCode (blocs Scratch en texte), API JavaScript (classe Maxy.Script), blocs 3D, interface, animation, scènes. À lire avant d'écrire un script.", schema: obj({ type: { type: 'string', enum: ['2d', '3d', 'app'], description: 'Type de projet (par défaut celui du projet).' } }) },
   { name: 'get_project', description: 'Résumé du projet : nom, type (2d, 3d, app), scènes avec leurs objets (nom, type, script), interface, fichiers.', schema: obj({ ...P }) },
   { name: 'list_files', description: "Liste les fichiers du projet (ou d'un dossier).", schema: obj({ ...P, folder: { type: 'string', description: 'Dossier relatif, par exemple scripts' } }) },
-  { name: 'read_file', description: 'Lit un fichier texte du projet : script .sc (MaxyCode) ou .js (JavaScript), scène .scene (JSON), prefab, clip .anim.', schema: obj({ ...P, path: { type: 'string', description: 'Chemin relatif, par exemple scripts/Joueur.sc' } }, ['path']) },
+  { name: 'read_file', description: 'Lit un fichier texte du projet : script .mc (MaxyCode) ou .js (JavaScript), scène .scene (JSON), prefab, clip .anim.', schema: obj({ ...P, path: { type: 'string', description: 'Chemin relatif, par exemple scripts/Joueur.mc' } }, ['path']) },
   { name: 'write_file', description: 'Crée ou remplace un fichier texte du projet (MaxyStudio recharge tout seul). Les fichiers JSON (.scene, .json, .anim, .prefab) sont vérifiés avant écriture. Pour un script, préfère create_script ; pour les objets, add_object et update_object.', schema: obj({ ...P, path: { type: 'string' }, content: { type: 'string' } }, ['path', 'content']), eager: true },
-  { name: 'create_script', description: "Crée un script et l'attache à un objet (ou à la Scène). Langage maxycode (fichier .sc, blocs en texte) ou javascript (fichier .js : export default class extends Maxy.Script { start() {} update(dt) {} }).", schema: obj({ ...P, ...SC, name: { type: 'string', description: 'Nom du script, par exemple Joueur' }, language: { type: 'string', enum: ['maxycode', 'javascript'] }, code: { type: 'string', description: 'Contenu du script (facultatif : un modèle est écrit sinon).' }, attach_to: { type: 'string', description: "Nom de l'objet qui exécute le script, ou \"stage\" pour la Scène. Facultatif." } }, ['name', 'language']), eager: true },
+  { name: 'create_script', description: "Crée un script et l'attache à un objet (ou à la Scène). Langage maxycode (fichier .mc, blocs en texte) ou javascript (fichier .js : export default class extends Maxy.Script { start() {} update(dt) {} }).", schema: obj({ ...P, ...SC, name: { type: 'string', description: 'Nom du script, par exemple Joueur' }, language: { type: 'string', enum: ['maxycode', 'javascript'] }, code: { type: 'string', description: 'Contenu du script (facultatif : un modèle est écrit sinon).' }, attach_to: { type: 'string', description: "Nom de l'objet qui exécute le script, ou \"stage\" pour la Scène. Facultatif." } }, ['name', 'language']), eager: true },
   { name: 'add_object', description: `Ajoute un objet à une scène. 2D : kind "sprite" (x, y en pixels, scène de 480 x 360 centrée en 0,0). 3D : kind parmi ${KINDS_3D.join(', ')} (position [x, y, z]). Pour un modèle 3D, donne model (chemin d'un .glb du projet, voir import_library_asset). Pour des particules, preset parmi ${PARTICLES.join(', ')}.`, schema: obj({ ...P, ...SC, kind: { type: 'string' }, name: { type: 'string' }, x: { type: 'number' }, y: { type: 'number' }, position: { type: 'array', items: { type: 'number' }, description: '3D : [x, y, z]' }, costume: { type: 'string', description: "2D : image du projet (sinon le lutin par défaut)" }, model: { type: 'string' }, preset: { type: 'string' }, color: { type: 'string', description: '3D : couleur #rrggbb' }, physics: { type: 'boolean', description: '3D : active la physique (gravité, collisions)' } }, ['kind', 'name']) },
   { name: 'update_object', description: "Modifie un objet d'une scène : les champs donnés sont fusionnés (par exemple {\"position\": [0, 2, 0]}, {\"mesh\": {\"color\": \"#ff0000\"}}, {\"x\": 100, \"size\": 50}, {\"rigidbody\": {\"enabled\": true}}). Lis d'abord la scène pour connaître les champs.", schema: obj({ ...P, ...SC, name: { type: 'string' }, changes: { type: 'object', description: 'Champs à modifier' } }, ['name', 'changes']) },
   { name: 'remove_object', description: "Supprime un objet d'une scène (et ses enfants en 3D).", schema: obj({ ...P, ...SC, name: { type: 'string' } }, ['name']) },
@@ -193,7 +193,7 @@ async function callTool(ctx, name, a = {}) {
     case 'write_file': {
       const dir = await ctx.project(a.project);
       const rel = String(a.path || '');
-      if (!TEXT_EXT.test(rel)) throw new Error("Seuls les fichiers texte s'écrivent ici (.sc, .js, .scene, .json…).");
+      if (!TEXT_EXT.test(rel)) throw new Error("Seuls les fichiers texte s'écrivent ici (.mc, .js, .scene, .json…).");
       const content = String(a.content ?? '');
       if (JSON_EXT.test(rel)) { try { JSON.parse(content); } catch (e) { throw new Error(`JSON invalide, rien n'a été écrit : ${e.message}`); } }
       const full = safe(dir, rel);

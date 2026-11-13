@@ -14,7 +14,7 @@
 //    (la liste _pile), que la ligne lit, puis retire. La pile rend la récursion possible (une fonction qui s'appelle elle-même).
 //    Une fonction qui renvoie une valeur est exécutée sans rafraîchir l'écran (define!) : elle ne doit pas contenir de wait.
 //
-// 3. Modules : « import [scripts/outils.sc] » ou « import [maths] » (bibliothèque standard : maths, texte, hasard).
+// 3. Modules : « import [scripts/outils.mc] » ou « import [maths] » (bibliothèque standard : maths, texte, hasard).
 //
 // compileMaxyCode(source, { resolve }) renvoie { code, lines, origins, errors } : le code Scratch, le numéro de ligne d'origine de chaque ligne
 // produite (pour afficher les erreurs du compilateur au bon endroit), et les erreurs propres à MaxyCode.
@@ -79,7 +79,7 @@ function extractCalls(expr, names, calls) {
 const fill = (s, pushed) => s.replace(/\u0001(\d+)\u0001/g, (_, k) => ref(pushed - 1 - +k));
 
 // ---------------------------------------------------------------- modules
-// « import [scripts/outils.sc] » ajoute au script les fonctions (define) d'un autre script du projet ;
+// « import [scripts/outils.mc] » ajoute au script les fonctions (define) d'un autre script du projet ;
 // « import [maths] » celles de la bibliothèque standard ci-dessous. Une fonction déjà définie dans le script est gardée.
 
 /** Bibliothèque standard de MaxyCode : des fonctions prêtes à importer. */
@@ -184,7 +184,7 @@ function expandImports(src, resolve, errors) {
     if (seen.has(name)) return;
     seen.add(name);
     const text = STDLIB[name] != null ? STDLIB[name] : resolve ? resolve(name) : null;
-    if (text == null) { errors.push({ line: importLine, message: `Module introuvable : « ${name} ». Indique un script du projet (scripts/outils.sc) ou un module de la bibliothèque : ${Object.keys(STDLIB).join(', ')}.` }); return; }
+    if (text == null) { errors.push({ line: importLine, message: `Module introuvable : « ${name} ». Indique un script du projet (scripts/outils.mc) ou un module de la bibliothèque : ${Object.keys(STDLIB).join(', ')}.` }); return; }
     const lines = String(text).replace(/\r\n?/g, '\n').split('\n');
     for (const sub of findImports(text)) visit(sub, importLine, [...chain, name]);
     for (const b of defineBlocks(lines)) {
