@@ -9,12 +9,21 @@
   let core = null;
   const coreReady = Scratch.external.importModule(BASE + 'sc3d-core.js').then(m => (core = m));
 
+  // Changement de scène : l'extension est rechargée. L'ancienne copie s'arrête et la nouvelle reprend son canevas
+  // (sinon deux mondes 3D seraient simulés et dessinés en même temps).
+  const GEN = window.__sc3dGen = (window.__sc3dGen || 0) + 1;
+  const alive = () => GEN === window.__sc3dGen;
+  const prev = window.__sc3d;
+  if (prev && typeof prev.dispose === 'function') { try { prev.dispose(); } catch (e) { /* ignoré */ } }
+
   const W = {
     world: null, renderer: null, canvas: null, camera: null, defaultCam: null, objects: new Map(), bodies: new Map(), mixers: new Map(), terrains: new Set(),
     running: false, ready: Promise.resolve(), follow: null, fps: null, keys: new Set(), mdx: 0, mdy: 0, accX: 0, accY: 0, scriptDt: 1 / 30,
     lastStep: 0, hud: null, sounds: [], underMouse: '', gravity: 9.81, project: null
   };
   window.__sc3d = W;
+  if (prev && prev.canvas && prev.canvas.isConnected && prev.renderer) { W.canvas = prev.canvas; W.renderer = prev.renderer; }
+  let listening = false;
 
   const project = () => window.__scProject || { type: '3d', scene: { objects: [] }, base: '' };
   const resolveUrl = rel => /^(https?|app|data|blob):/.test(rel) ? rel : project().base + String(rel).split('/').map(encodeURIComponent).join('/');
@@ -51,7 +60,10 @@
   // ---------- Monde ----------
   function stageBox() { return Scratch.renderer.canvas.parentElement; }
   function ensureCanvas() {
-    if (W.canvas && W.canvas.isConnected) return;
+    if (W.canvas && W.canvas.isConnected) {
+      if (!listening) { listening = true; const box = stageBox(); box.addEventListener('mousedown', onPointerDown, true); box.addEventListener('mousemove', onPointerMove, true); }
+      return;
+    }
     const THREE = core.THREE;
     W.canvas = document.createElement('canvas');
     W.canvas.className = 'sc3d-canvas';
@@ -66,6 +78,7 @@
     W.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     box.addEventListener('mousedown', onPointerDown, true);
     box.addEventListener('mousemove', onPointerMove, true);
+    listening = true;
   }
   function pick(e) {
     if (!W.world) return null;
@@ -85,13 +98,13 @@
     return null;
   }
   function onPointerDown(e) {
-    if (!W.running) return;
+    if (!W.running || !alive()) return;
     const o = pick(e);
     if (!o) return;
     const t = runtime.targets.find(x => x.isOriginal && !x.isStage && x.getName() === o.name);
     if (t) runtime.startHats('sc3dengine_whenClicked', null, t);
   }
-  function onPointerMove(e) { if (W.running) { const o = pick(e); W.underMouse = o ? o.name : ''; } }
+  function onPointerMove(e) { if (W.running && alive()) { const o = pick(e); W.underMouse = o ? o.name : ''; } }
 
   function register(obj) {
     W.objects.set(obj.userData.id, obj);
@@ -136,8 +149,9 @@
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
-  runtime.on('PROJECT_START', () => { W.ready = startWorld().catch(e => print('Erreur 3D : ' + (e.message || e), 'error')); });
-  runtime.on('PROJECT_STOP_ALL', () => { W.running = false; W.sounds.forEach(a => a.pause()); if (document.pointerLockElement) document.exitPointerLock(); });
+  W.dispose = () => { stopWorld(); W.world = null; };
+  runtime.on('PROJECT_START', () => { if (alive()) W.ready = startWorld().catch(e => print('Erreur 3D : ' + (e.message || e), 'error')); });
+  runtime.on('PROJECT_STOP_ALL', () => { if (!alive()) return; W.running = false; W.sounds.forEach(a => a.pause()); if (document.pointerLockElement) document.exitPointerLock(); });
 
   // ---------- Physique simple (boîtes alignées) ----------
   const boxes = new Map();
@@ -265,6 +279,7 @@
   }
 
   function frame(now) {
+    if (!alive()) return;
     requestAnimationFrame(frame);
     if (!W.world || !W.renderer) return;
     const dt = Math.min(0.05, (now - (W.last || now)) / 1000);

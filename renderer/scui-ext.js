@@ -7,6 +7,11 @@
   const project = () => window.__scProject || { base: '' };
   const resolveUrl = rel => /^(https?|app|data|blob):/.test(rel) ? rel : project().base + String(rel).split('/').map(encodeURIComponent).join('/');
 
+  // Changement de scène : l'extension est rechargée. Seule la dernière copie reste active (sinon l'interface serait en double).
+  const GEN = window.__scuiGen = (window.__scuiGen || 0) + 1;
+  const alive = () => GEN === window.__scuiGen;
+  if (typeof window.__scuiDispose === 'function') { try { window.__scuiDispose(); } catch (e) { /* ignoré */ } }
+
   let layer = null;
   const els = new Map();
   let clicked = { id: '', t: 0 };
@@ -109,7 +114,7 @@
   }
   window.__maxyUi = { get: id => getEl(id) };
   const getEl = id => { id = Cast.toString(id); return els.get(id) || hud.get(id) || [...hud.entries()].find(([k]) => k.toLowerCase() === id.toLowerCase())?.[1]; };
-  runtime.on('PROJECT_START', () => { clearAll(); buildHud(); startAnims(); startJs(); });
+  runtime.on('PROJECT_START', () => { if (alive()) { clearAll(); buildHud(); startAnims(); startJs(); } });
 
   // ---------- Scripts JavaScript (maxyjs.js) ----------
   let jsMod = null;
@@ -124,11 +129,11 @@
       return m.start({ runtime, project: project(), base: project().base, bust: window.__maxyJsBust || '' });
     }).catch(e => runtime.emit('SC_PRINT', { text: 'Scripts JavaScript : ' + (e.message || e), level: 'error' }));
   }
-  runtime.on('PROJECT_STOP_ALL', () => { if (jsMod) jsMod.stop(); });
+  runtime.on('PROJECT_STOP_ALL', () => { if (alive() && jsMod) jsMod.stop(); });
   // Clics et messages de MaxyCode : transmis aussi aux scripts .js
   const startHats = runtime.startHats;
   runtime.startHats = function (opcode, fields, target) {
-    if (jsMod) { try { jsMod.hat(opcode, fields, target); } catch (e) { /* ignoré */ } }
+    if (jsMod && alive()) { try { jsMod.hat(opcode, fields, target); } catch (e) { /* ignoré */ } }
     return startHats.apply(this, arguments);
   };
 
@@ -180,6 +185,7 @@
     if ('direction' in vals) t.setDirection(vals.direction);
   }
   function animTick(now) {
+    if (!alive()) return;
     requestAnimationFrame(animTick);
     const dt = animLast ? Math.min(0.1, (now - animLast) / 1000) : 0;
     animLast = now;
@@ -205,7 +211,15 @@
       loadClip(o.animator.clip).then(c => { if (c && animOn) anims.set(o.name, { clip: c, t: 0, playing: true, once: false }); });
     }
   }
-  runtime.on('PROJECT_STOP_ALL', () => { animOn = false; });
+  runtime.on('PROJECT_STOP_ALL', () => { if (alive()) animOn = false; });
+  window.__scuiDispose = () => {
+    animOn = false; anims.clear();
+    for (const el of hud.values()) el.remove();
+    hud.clear();
+    clearAll();
+    if (layer) layer.remove();
+    if (hudLayer) hudLayer.remove();
+  };
   window.__maxyAnim = {
     play: (name, clip, once) => loadClip(clipRel(clip)).then(c => { if (c) { animOn = true; anims.set(name, { clip: c, t: 0, playing: true, once: !!once }); } }),
     stop: name => anims.delete(name)
