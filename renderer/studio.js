@@ -3,6 +3,7 @@ import * as core from './sc3d-core.js';
 import { SceneView3D } from './scene-view3d.js';
 import { SceneView2D } from './scene-view2d.js';
 import { initPlugins } from './plugins.js';
+import { initPublish } from './publish.js';
 import { UiEditor, UI_TYPES, UI_ICON, defaultUiElement } from './ui-editor.js';
 import { AnimEditor, newClip } from './anim-editor.js';
 import { MAXY_DTS, JSCONFIG, jsTemplate } from './maxyjs-types.js';
@@ -1586,7 +1587,14 @@ async function openInEditor(id, rel = null, line = 1) {
 function setupJsLanguage() {
   const js = monaco.languages.typescript && monaco.languages.typescript.javascriptDefaults;
   if (!js) return;
-  js.setCompilerOptions({ target: monaco.languages.typescript.ScriptTarget.ES2020, allowNonTsExtensions: true, allowJs: true, checkJs: false, module: monaco.languages.typescript.ModuleKind.ESNext });
+  js.setCompilerOptions({ target: monaco.languages.typescript.ScriptTarget.ES2020, allowNonTsExtensions: true, allowJs: true, checkJs: true, noImplicitAny: false, strict: false, module: monaco.languages.typescript.ModuleKind.ESNext });
+  // Les fautes (méthode qui n'existe pas, mauvais nom, mauvais nombre d'arguments) sont soulignées pendant l'écriture, avant de lancer le jeu
+  // On garde les vraies fautes (nom mal écrit, variable inconnue, erreur de syntaxe) ; les contrôles de types trop stricts
+  // pour du JavaScript, qui signaleraient du code correct, sont ignorés.
+  js.setDiagnosticsOptions({
+    noSemanticValidation: false, noSyntaxValidation: false, noSuggestionDiagnostics: true,
+    diagnosticCodesToIgnore: [2339, 2353, 2345, 2322, 1345, 2531, 2532, 2533, 18047, 18048, 2769, 2739, 2740, 2741, 2367, 2362, 2363, 2365, 2349, 2351, 2571, 2488, 2538, 7053, 2554, 2556, 2559, 2560, 2493, 2461, 2416, 2335, 2307, 2792, 2683, 2686, 2488, 2794, 2775, 2774]
+  });
   js.addExtraLib(MAXY_DTS, 'file:///types/maxy.d.ts');
 }
 
@@ -2059,6 +2067,7 @@ const MENUS = {
     { label: 'Définir comme scène de départ', ic: 'flag', disabled: S.scenePath === (S.config.mainScene || 'scenes/Main.scene'), fn: setStartScene },
     '-',
     { label: 'Tout enregistrer', ic: 'save', key: 'Ctrl+S', fn: saveAll },
+    ...(publisher ? [{ label: 'Publier sur MaxyGame…', ic: 'rocket', fn: () => publisher.publish() }, { label: 'Compte MaxyGame…', ic: 'settings', fn: () => publisher.accountMenu() }] : []),
     { label: 'Exporter le projet (.maxycode)…', ic: 'share', fn: exportProject },
     { label: `Exporter le jeu en application (${studio.platform === 'win32' ? '.exe Windows' : studio.platform === 'darwin' ? '.app macOS' : 'Linux'})…`, ic: 'rocket', fn: exportGameApp },
     '-',
@@ -2139,6 +2148,9 @@ async function exportProject() {
   } catch (e) { toast(cleanErr(e), true); }
 }
 $('#exportBtn').onclick = exportProject;
+// Publication sur MaxyGame (bouton Publier et menu Fichier)
+const publisher = studio.publish ? initPublish({ $, esc, modal, toast, log, status, S, DIR, cleanErr, play: () => play(), stop: () => stop(), saveAll: () => saveAll(), activateTab: t => activateTab(t) }) : null;
+if ($('#publishBtn')) { if (publisher) $('#publishBtn').onclick = () => publisher.publish(); else $('#publishBtn').hidden = true; }
 $('#projBtn').onclick = async e => {
   const el = e.currentTarget;
   const recent = (await studio.recent()).filter(p => p.path !== DIR).slice(0, 8);

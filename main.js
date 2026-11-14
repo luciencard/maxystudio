@@ -8,7 +8,7 @@
 //     MAXYCODE.md           guide de syntaxe (utile aux assistants IA) ; SCRATCHCODE.md avant la 2.1
 // Un projet entier peut aussi être échangé en un seul fichier .maxycode (archive zip ; .scratchcode avant la 2.1).
 
-const { app, BrowserWindow, ipcMain, dialog, protocol, shell, Menu, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, protocol, shell, Menu, safeStorage, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
@@ -565,14 +565,18 @@ ipcMain.handle('project:export', async (e, dir, name) => {
     filters: [{ name: 'Projet MaxyStudio (.maxycode)', extensions: ['maxycode'] }]
   });
   if (r.canceled || !r.filePath) return null;
+  await fsp.writeFile(r.filePath, await projectArchive(dir));
+  return r.filePath;
+});
+/** Le projet en archive .maxycode (zip). */
+async function projectArchive(dir) {
   const entries = {};
   for (const rel of await walkFiles(dir)) {
     if (/\.sb3$/i.test(rel)) continue;
     entries[rel] = await fsp.readFile(path.join(dir, rel));
   }
-  await fsp.writeFile(r.filePath, createZipBuffer(entries));
-  return r.filePath;
-});
+  return createZipBuffer(entries);
+}
 ipcMain.handle('play:archive', (_e, dir, spec) => buildPlayArchive(dir, spec));
 
 // ---------- Export du jeu en application (Windows .exe, macOS .app, Linux) ----------
@@ -898,6 +902,7 @@ function disconnectAi(id) {
   return { ok: true };
 }
 // Maxy AI : l'assistant intégré (API Anthropic, clé de l'utilisateur chiffrée)
+require('./maxy-publish.js')({ app, ipcMain, shell, safeStorage, BrowserWindow, nativeImage, buildArchive: projectArchive });
 require('./maxy-ai.js')({ app, ipcMain, safeStorage, BrowserWindow, projectWins, bridgeCall, rootDir: ROOT, libDir: LIB_DIR, recentFile });
 ipcMain.handle('ai:list', () => aiTargets().map(t => ({ id: t.id, group: t.group, label: t.label, installed: t.installed, connected: aiConnected(t), file: t.file })));
 ipcMain.handle('ai:connect', (_e, id) => connectAi(id));

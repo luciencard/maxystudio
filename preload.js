@@ -62,5 +62,16 @@ contextBridge.exposeInMainWorld('studio', {
     undo: () => ipcRenderer.invoke('maxyai:undo'),
     onEvent: (cb) => ipcRenderer.on('maxyai:event', (_e, ev) => cb(ev))
   },
+  publish: {
+    account: () => ipcRenderer.invoke('publish:account'),
+    login: () => ipcRenderer.invoke('publish:login'),
+    loginUrl: () => ipcRenderer.invoke('publish:loginUrl'),
+    logout: () => ipcRenderer.invoke('publish:logout'),
+    mine: () => ipcRenderer.invoke('publish:mine'),
+    capture: (rect) => ipcRenderer.invoke('publish:capture', rect),
+    game: (dir, fiche) => ipcRenderer.invoke('publish:game', dir, fiche),
+    open: (url) => ipcRenderer.invoke('publish:open', url),
+    onProgress: (cb) => ipcRenderer.on('publish:progress', (_e, text, pct) => cb(text, pct))
+  },
   onChanged: (cb) => ipcRenderer.on('project:changed', (_e, files) => cb(files))
 });

@@ -2,6 +2,7 @@
 // (fichier types/maxy.d.ts + jsconfig.json écrits dans le projet).
 
 export const MAXY_DTS = `// Types de l'API JavaScript de MaxyStudio (autocomplétion). Ne pas modifier : MaxyStudio réécrit ce fichier.
+interface Window { [key: string]: any }
 declare namespace Maxy {
   /** Objet 2D (lutin). */
   interface Sprite2D {
@@ -94,6 +95,8 @@ declare namespace Maxy {
   const is3D: boolean;
   /** three.js (projets 3D). */
   const THREE: any;
+  /** Le monde 3D du moteur (accès avancé : objets, caméra, physique). */
+  const world: any;
   /** Touche enfoncée : 'Space', 'ArrowUp', 'KeyW' ou 'w'… */
   function key(name: string): boolean;
   /** Touche appuyée pendant cette image seulement. */
@@ -118,7 +121,7 @@ declare namespace Maxy {
 }
 `;
 
-export const JSCONFIG = JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ES2022', checkJs: false, lib: ['ES2022', 'DOM'] }, include: ['scripts/**/*.js', 'types/maxy.d.ts'] }, null, 2) + '\n';
+export const JSCONFIG = JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ES2022', checkJs: true, lib: ['ES2022', 'DOM'] }, include: ['scripts/**/*.js', 'types/maxy.d.ts'] }, null, 2) + '\n';
 
 export function jsTemplate(type, name) {
   const cls = String(name || 'Script').replace(/[^A-Za-z0-9_]/g, '') || 'Script';
