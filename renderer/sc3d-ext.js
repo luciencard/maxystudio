@@ -9,8 +9,9 @@
   let core = null;
   const coreReady = Scratch.external.importModule(BASE + 'sc3d-core.js').then(m => (core = m));
 
-  // Changement de scène : l'extension est rechargée. L'ancienne copie s'arrête et la nouvelle reprend son canevas
-  // (sinon deux mondes 3D seraient simulés et dessinés en même temps).
+  // Changement de scène (et chaque lancement dans MaxyStudio) : le moteur recharge l'extension, mais il exécute toujours
+  // les blocs avec la PREMIÈRE copie. On réutilise donc cette copie : sinon deux mondes 3D seraient simulés et dessinés.
+  if (window.__sc3dInstance && window.__sc3dInstance.runtime === runtime) { Scratch.extensions.register(window.__sc3dInstance.ext); return; }
   const GEN = window.__sc3dGen = (window.__sc3dGen || 0) + 1;
   const alive = () => GEN === window.__sc3dGen;
   const prev = window.__sc3d;
@@ -616,5 +617,6 @@
     const fn = ext[b.opcode].bind(ext);
     ext[b.opcode] = (args, util) => { runtime.requestRedraw(); return fn(args, util); };
   }
+  window.__sc3dInstance = { runtime, ext };
   Scratch.extensions.register(ext);
 })(Scratch);

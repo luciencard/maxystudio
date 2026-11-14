@@ -7,7 +7,10 @@
   const project = () => window.__scProject || { base: '' };
   const resolveUrl = rel => /^(https?|app|data|blob):/.test(rel) ? rel : project().base + String(rel).split('/').map(encodeURIComponent).join('/');
 
-  // Changement de scène : l'extension est rechargée. Seule la dernière copie reste active (sinon l'interface serait en double).
+  // Changement de scène (et chaque lancement dans MaxyStudio) : le moteur recharge l'extension, mais il exécute toujours
+  // les blocs avec la PREMIÈRE copie. On réutilise donc cette copie, sans rien ajouter : sinon l'interface serait
+  // construite en double et les blocs parleraient à une copie vide.
+  if (window.__scuiInstance && window.__scuiInstance.runtime === runtime) { Scratch.extensions.register(window.__scuiInstance.ext); return; }
   const GEN = window.__scuiGen = (window.__scuiGen || 0) + 1;
   const alive = () => GEN === window.__scuiGen;
   if (typeof window.__scuiDispose === 'function') { try { window.__scuiDispose(); } catch (e) { /* ignoré */ } }
@@ -225,6 +228,29 @@
     stop: name => anims.delete(name)
   };
 
+  // ---------- Réseau : salons en temps réel (maxynet.js) ----------
+  // Les messages arrivent dans une file : un par image du moteur, pour que les blocs lisent « last message » sans en perdre.
+  let netP = null;
+  const getNet = () => netP || (netP = import(new URL('/studio/maxynet.js', location.href).href).then(m => {
+    m.net.hook = (room, event, value) => {
+      if (!alive()) return;
+      if (event === 'message' || event === 'live') netQueue.push({ room: room.name, text: typeof value.data === 'string' ? value.data : JSON.stringify(value.data), name: value.name, uid: value.uid, live: event === 'live' });
+      if (event === 'error') runtime.emit('SC_PRINT', { text: `Salon « ${room.name} » : ${value}`, level: 'warn' });
+    };
+    return m.net;
+  }));
+  const netQueue = [];
+  let netCur = { room: '', text: '', name: '', uid: '', live: false };
+  let myName = '', myId = '';
+  const learnMe = () => getNet().then(n => n.me()).then(me => { if (me) { myName = me.name; myId = me.uid; } }).catch(() => {});
+  const netStep = runtime._step;
+  runtime._step = function () {
+    if (alive() && netQueue.length) { netCur = netQueue.shift(); startHats.call(runtime, 'scuiapp_whenNetMessage'); }
+    return netStep.call(this);
+  };
+  runtime.on('PROJECT_STOP_ALL', () => { if (alive()) { netQueue.length = 0; if (window.__maxyNet) window.__maxyNet.closeAll(); } });
+  const netFail = e => runtime.emit('SC_PRINT', { text: 'Jeu en ligne : ' + (e && e.message || e), level: 'error' });
+
   const S = (v = '') => ({ type: Scratch.ArgumentType.STRING, defaultValue: v });
   const cmd = (opcode, text, args = {}) => ({ opcode, blockType: Scratch.BlockType.COMMAND, text, arguments: args });
 
@@ -259,7 +285,23 @@
           cmd('goToScene', 'go to scene [NAME]', { NAME: S('Niveau 2') }),
           { opcode: 'sceneName', blockType: Scratch.BlockType.REPORTER, text: 'scene name', disableMonitor: true },
           // Débogueur de MaxyStudio : point de contrôle ajouté automatiquement avant chaque ligne en mode débogage
-          cmd('debugLine', 'debug line [ID]', { ID: S('') })
+          cmd('debugLine', 'debug line [ID]', { ID: S('') }),
+          // Réseau : salons en temps réel (discussion, multijoueur), avec le compte MaxyGame du joueur
+          { blockType: Scratch.BlockType.LABEL, text: 'Jeu en ligne' },
+          cmd('netJoin', 'join room [ROOM]', { ROOM: S('general') }),
+          cmd('netSend', 'send [TEXT] to room [ROOM]', { TEXT: S('Salut !'), ROOM: S('general') }),
+          cmd('netLive', 'send instant [TEXT] to room [ROOM]', { TEXT: S('x:0 y:0'), ROOM: S('general') }),
+          { opcode: 'whenNetMessage', blockType: Scratch.BlockType.HAT, isEdgeActivated: false, text: 'when message received in room [ROOM]', arguments: { ROOM: S('general') } },
+          { opcode: 'netText', blockType: Scratch.BlockType.REPORTER, text: 'last message', disableMonitor: true },
+          { opcode: 'netFrom', blockType: Scratch.BlockType.REPORTER, text: 'last message author', disableMonitor: true },
+          { opcode: 'netFromId', blockType: Scratch.BlockType.REPORTER, text: 'last message author id', disableMonitor: true },
+          { opcode: 'netIsLive', blockType: Scratch.BlockType.BOOLEAN, text: 'last message instant?' },
+          { opcode: 'netMyName', blockType: Scratch.BlockType.REPORTER, text: 'my player name', disableMonitor: true },
+          { opcode: 'netMyId', blockType: Scratch.BlockType.REPORTER, text: 'my player id', disableMonitor: true },
+          { opcode: 'netCount', blockType: Scratch.BlockType.REPORTER, text: 'players in room [ROOM]', arguments: { ROOM: S('general') }, disableMonitor: true },
+          { opcode: 'netConnected', blockType: Scratch.BlockType.BOOLEAN, text: 'connected to room [ROOM]?', arguments: { ROOM: S('general') } },
+          { opcode: 'netCode', blockType: Scratch.BlockType.REPORTER, text: 'new private room code', disableMonitor: true },
+          cmd('netLeave', 'leave room [ROOM]', { ROOM: S('general') })
         ],
         menus: {
           props: { acceptReporters: false, items: ['color', 'background', 'text size', 'width', 'visible'] },
@@ -275,6 +317,26 @@
       if (util && util.thread) util.thread.status = 4; // arrête ce script : la nouvelle scène prend la suite
     }
     sceneName() { return window.__maxySceneName || ''; }
+    netJoin(a) { return getNet().then(n => n.join(Cast.toString(a.ROOM))).then(r => { if (r.me) { myName = r.me.name; myId = r.me.uid; } }, netFail); }
+    netSend(a) {
+      return getNet().then(n => {
+        const r = n.room(Cast.toString(a.ROOM));
+        if (!r) throw new Error(`rejoins d\'abord le salon « ${Cast.toString(a.ROOM)} » (join room).`);
+        r.send(Cast.toString(a.TEXT));
+      }).catch(netFail);
+    }
+    netLive(a) { return getNet().then(n => { const r = n.room(Cast.toString(a.ROOM)); if (r) r.live(Cast.toString(a.TEXT)); }).catch(() => {}); }
+    whenNetMessage(a) { return Cast.toString(a.ROOM).trim() === netCur.room; }
+    netText() { return netCur.text; }
+    netFrom() { return netCur.name; }
+    netFromId() { return netCur.uid; }
+    netIsLive() { return !!netCur.live; }
+    netMyName() { return myName || learnMe().then(() => myName); }
+    netMyId() { return myId || learnMe().then(() => myId); }
+    netCount(a) { const n = window.__maxyNet; const r = n && n.room(Cast.toString(a.ROOM)); return r ? r.members.length : 0; }
+    netConnected(a) { const n = window.__maxyNet; const r = n && n.room(Cast.toString(a.ROOM)); return !!(r && r.connected); }
+    netCode() { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; return [...crypto.getRandomValues(new Uint8Array(8))].map(x => c[x % c.length]).join(''); }
+    netLeave(a) { const n = window.__maxyNet; if (n) n.leave(Cast.toString(a.ROOM)); }
     debugLine(args, util) { const f = window.__maxyDebug; return typeof f === 'function' ? f(String(args.ID), util) : undefined; }
     addTitle(a) { const el = document.createElement('div'); el.className = 'scui-label scui-title'; el.textContent = Cast.toString(a.TEXT); put(a.ID, el); }
     addLabel(a) { const el = document.createElement('div'); el.className = 'scui-label'; el.textContent = Cast.toString(a.TEXT); put(a.ID, el); }
@@ -333,5 +395,7 @@
       root().appendChild(el); setTimeout(() => el.remove(), 2600);
     }
   }
-  Scratch.extensions.register(new MaxyCodeUI());
+  const uiExt = new MaxyCodeUI();
+  window.__scuiInstance = { runtime, ext: uiExt };
+  Scratch.extensions.register(uiExt);
 })(Scratch);

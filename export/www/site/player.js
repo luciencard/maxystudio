@@ -233,6 +233,8 @@ export async function runGame(frame, id, archive, log = () => {}, step = () => {
     win.__scProject = { type: project.type, scene: JSON.parse(JSON.stringify(scene)), base: `/jeux-cache/${id}/` };
     win.__maxySceneName = name;
     win.__maxyGoToScene = goToScene;
+    // Jeu en ligne : la page qui lance le jeu fournit le ticket réseau (window.__maxyNetTicket)
+    win.__maxyNetTicket = typeof window.__maxyNetTicket === 'function' ? () => window.__maxyNetTicket() : null;
     let errors = 0;
     if (first) step('Préparation des scripts…', 0.85);
     const compile = async (target, rel) => {

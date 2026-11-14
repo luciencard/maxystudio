@@ -234,7 +234,27 @@ module.exports = function setupPublish({ app, ipcMain, shell, safeStorage, Brows
     return { id, url: `${SITE}/jeu/?id=${encodeURIComponent(id)}`, updated: !!updating, size: archive.length };
   }
 
+  // ---------- Jeu en ligne dans MaxyStudio ----------
+  // Le jeu testé dans l'éditeur reçoit un ticket réseau valable seulement pour ses salons de test
+  // (identifiant réseau gardé dans project.maxycode : un ami qui ouvre le même projet rejoint les mêmes salons).
+  async function netTicket(dir) {
+    const cfgPath = path.join(dir, 'project.maxycode');
+    const cfg = JSON.parse(await fsp.readFile(cfgPath, 'utf8'));
+    if (!/^[A-Za-z0-9]{12,40}$/.test(cfg.netId || '')) {
+      cfg.netId = crypto.randomBytes(12).toString('hex');
+      await fsp.writeFile(cfgPath, JSON.stringify(cfg, null, 2));
+    }
+    let s;
+    try { s = await getSession(); }
+    catch (e) { return { error: e.code === 'login' ? 'Pour tester le jeu en ligne, connecte ton compte MaxyGame : Fichier > Compte MaxyGame.' : e.message, code: e.code || 'offline' }; }
+    try {
+      const t = await post(`${SERVER}/net/ticket`, { idToken: s.idToken, game: `test-${cfg.netId}` });
+      return { ...t, server: SERVER };
+    } catch (e) { return { error: e.message, code: (e.data && e.data.code) || 'offline' }; }
+  }
+
   const win = e => BrowserWindow.fromWebContents(e.sender);
+  ipcMain.handle('net:ticket', (_e, dir) => netTicket(dir));
   ipcMain.handle('publish:account', () => { const a = load(); return a ? { connected: true, name: a.name } : { connected: false }; });
   ipcMain.handle('publish:login', () => login());
   ipcMain.handle('publish:loginUrl', () => (pending && pending.url) || null); // tests seulement

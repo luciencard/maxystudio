@@ -110,6 +110,46 @@ declare namespace Maxy {
   function send(message: string, data?: any): void;
   /** Élément de l'onglet Interface, par son nom. */
   function ui(name: string): UiElement;
+  /** Message d'un salon. */
+  interface NetMessage { id: string; uid: string; name: string; time: number; data: any; mine: boolean }
+  /** Salon en temps réel (discussion, multijoueur). Même nom = même salon pour tous les joueurs du jeu. */
+  interface NetRoom {
+    readonly name: string;
+    readonly me: { uid: string; name: string };
+    /** Joueurs connectés. */
+    readonly members: { uid: string; name: string }[];
+    /** 100 derniers messages gardés. */
+    readonly history: NetMessage[];
+    readonly connected: boolean;
+    on(event: 'message' | 'live', fn: (m: NetMessage) => void): NetRoom;
+    on(event: 'join' | 'leave', fn: (user: { uid: string; name: string }) => void): NetRoom;
+    on(event: 'deleted', fn: (id: string) => void): NetRoom;
+    on(event: 'error', fn: (text: string) => void): NetRoom;
+    on(event: 'connect' | 'disconnect', fn: (room: NetRoom) => void): NetRoom;
+    off(event: string, fn: Function): NetRoom;
+    /** Message gardé dans l'historique (2 000 caractères au plus, 8 toutes les 10 s). */
+    send(data: any): void;
+    /** Message instantané, non gardé (positions...) : 40 par seconde au plus. */
+    live(data: any): void;
+    /** Signale un message à la modération. */
+    report(id: string, reason?: string): void;
+    /** Supprime un de ses propres messages. */
+    remove(id: string): void;
+    leave(): void;
+  }
+  /** Jeu en ligne, avec le compte MaxyGame du joueur. */
+  const net: {
+    join(room: string): Promise<NetRoom>;
+    room(name: string): NetRoom | null;
+    leave(name: string): void;
+    me(): Promise<{ uid: string; name: string }>;
+    /** Ne plus voir les messages d'un joueur (sur cet appareil). */
+    block(uid: string): void;
+    unblock(uid: string): void;
+    blocked(): string[];
+    /** Code au hasard pour un salon privé. */
+    code(length?: number): string;
+  };
   function goToScene(name: string): void;
   /** Nombre au hasard (entier si a et b sont entiers). */
   function random(a?: number, b?: number): number;

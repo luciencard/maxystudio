@@ -62,6 +62,7 @@ contextBridge.exposeInMainWorld('studio', {
     undo: () => ipcRenderer.invoke('maxyai:undo'),
     onEvent: (cb) => ipcRenderer.on('maxyai:event', (_e, ev) => cb(ev))
   },
+  net: { ticket: (dir) => ipcRenderer.invoke('net:ticket', dir) },
   publish: {
     account: () => ipcRenderer.invoke('publish:account'),
     login: () => ipcRenderer.invoke('publish:login'),

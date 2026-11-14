@@ -1190,6 +1190,12 @@ async function runScene(sc, scene, vars, name, debug = DBG.on) {
   frame.contentWindow.__scProject = { type: S.type, scene: JSON.parse(JSON.stringify(scene)), base: S.base };
   frame.contentWindow.__maxySceneName = name;
   frame.contentWindow.__maxyGoToScene = goToScene;
+  // Jeu en ligne : ticket réseau donné par MaxyStudio (compte MaxyGame connecté), jamais le compte lui-même
+  frame.contentWindow.__maxyNetTicket = studio.net ? async () => {
+    const t = await studio.net.ticket(DIR);
+    if (t && t.code === 'login') toast(t.error, true);
+    return t;
+  } : null;
   frame.contentWindow.__maxyDebug = debug ? debugHook : null;
   frame.contentWindow.__scPaused = false;
   for (const el of frame.contentDocument.querySelectorAll('html, body, .gui, .stage-pane, .stage-wrap')) { el.scrollTop = 0; el.scrollLeft = 0; }

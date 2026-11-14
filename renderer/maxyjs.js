@@ -9,6 +9,8 @@
 // Le code s'exécute tel quel dans le moteur (pas de traduction) : c'est le langage le plus rapide de MaxyStudio.
 // Variables de la Scène, messages, interface et clips sont partagés avec MaxyCode.
 
+import { net } from './maxynet.js';
+
 const D2R = Math.PI / 180;
 let session = 0;
 let state = null;
@@ -204,6 +206,8 @@ const Maxy = {
       hide() { const e = get(); if (e) e.style.display = 'none'; }
     };
   },
+  /** Jeu en ligne : salons en temps réel (discussion, multijoueur). */
+  net,
   goToScene(name) { const g = window.__maxyGoToScene; if (typeof g === 'function') setTimeout(() => g(String(name)), 0); },
   random(a = 0, b = 1) { return Number.isInteger(a) && Number.isInteger(b) ? a + Math.floor(Math.random() * (b - a + 1)) : a + Math.random() * (b - a); },
   wait(seconds) { return new Promise(r => setTimeout(r, Math.max(0, seconds) * 1000)); },
@@ -298,7 +302,7 @@ export async function start({ runtime, project, base, bust = '' }) {
   for (const i of state.list) call(i, 'start');
   requestAnimationFrame(t => { if (state && state.id === id) { state.last = t; tick(t); } });
 }
-export function stop() { if (state) state.on = false; }
+export function stop() { if (state) state.on = false; net.closeAll(); }
 /** Clic sur un objet ou message envoyé par MaxyCode : prévient les scripts .js concernés. */
 export function hat(opcode, fields, target) {
   if (!state || !state.on) return;
